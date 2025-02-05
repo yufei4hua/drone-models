@@ -16,10 +16,9 @@ from scipy.spatial.transform import Rotation as R
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-
-def quat2euler(quat: NDArray[np.floating], seq: str, degrees: bool = False) -> NDArray[np.floating]:
+def from_quat(quat: NDArray[np.floating]) -> R:
     if isinstance(quat, np.ndarray):
-        return R.from_quat(quat).as_euler(seq, degrees=degrees)
+        return R.from_quat(quat)
     if isinstance(quat, jp.ndarray):
-        return JR.from_quat(quat).as_euler(seq, degrees=degrees)
+        return JR.from_quat(quat)
     raise ValueError(f"Expected numpy or jax array, got {type(quat)}")
