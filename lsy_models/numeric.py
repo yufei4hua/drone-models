@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-import lsy_models.const as const
-from lsy_models import rotation as R
+import lsy_models.utils.const as const
+import lsy_models.utils.rotation as R
 
 if TYPE_CHECKING:
     from types import FunctionType

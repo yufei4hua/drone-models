@@ -4,7 +4,7 @@ import jax.numpy as jp
 import numpy as np
 import pytest
 
-import lsy_models.rotation as R
+import lsy_models.utils.rotation as R
 
 tol = 1e-6 # Since Jax by default works with 32 bit, the precision is worse
 

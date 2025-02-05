@@ -49,7 +49,7 @@ class Constants:
     @classmethod
     def create(cls, path: str):
         # Constants
-        drone_path = Path(__file__).parents[0] / path
+        drone_path = Path(__file__).parents[1] / path
         # read in all parameters from xml
         params = ET.parse(drone_path).findall(".//custom/numeric") 
         # create a dict from parameters containing array of floats
