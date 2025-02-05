@@ -63,10 +63,14 @@
     <!-- Physical Parameters-->
     <numeric name="gravity" data="9.807"/> <!-- Munich, Germany-->
     <numeric name="mass" data="0.03454"/>
-    <numeric name="J" data="1.4e-5 0.0    0.0 
+    <!--numeric name="J" data="1.4e-5 0.0    0.0 
                             0.0    1.4e-5 0.0
-                            0.0    0.0    2.17e-5"/>
-    <numeric name="arm" data="0.046"/>
+                            0.0    0.0    2.17e-5"/--> <!-- From IROS 2022 -->
+    <numeric name="J" data="1.68e-5 0.0    0.0 
+                            0.0    1.68e-5 0.0
+                            0.0    0.0    2.98e-5"/> <!-- From Förster B.S. thesis -->
+    <!-- Length of the arm = distance of motor in "+"" config => in "x" config use arm/sqrt(2) -->
+    <numeric name="arm" data="0.046"/> 
     <numeric name="prop_radius" data="2.31348e-2"/>
 
     <!-- Motors and Thrust-->
