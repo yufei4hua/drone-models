@@ -1,6 +1,7 @@
 """Tests of the numeric models."""
 
 import casadi as cs
+import jax
 import jax.numpy as jp
 import numpy as np
 import pytest
@@ -8,18 +9,25 @@ import pytest
 import lsy_models.numeric
 import lsy_models.symbolic
 
+# For all tests to pass, we need the same precsion in jax as in np
+jax.config.update("jax_enable_x64", True)
+
 N = 1000
-pos = np.random.uniform(-5, 5, (N,3))
-vel = np.random.uniform(-5, 5, (N,3))
-quat = np.random.uniform(-5, 5, (N,4))
-quat = quat / np.expand_dims(np.linalg.norm(quat, axis=1), -1) # unit quaternions!
-angvel = np.random.uniform(-2, 2, (N,3))
-forces_motor = np.random.uniform(0, 0.15, (N,4))
-forces_cmd = np.random.uniform(0, 0.15, (N,4))
+
+def create_rnd_states_inputs(N=1000):
+    pos = np.random.uniform(-5, 5, (N,3))
+    vel = np.random.uniform(-5, 5, (N,3))
+    quat = np.random.uniform(-5, 5, (N,4)) # all rotation libraries should be normalizing automatically
+    angvel = np.random.uniform(-2, 2, (N,3))
+    forces_motor = np.random.uniform(0, 0.15, (N,4))
+    forces_cmd = np.random.uniform(0, 0.15, (N,4))
+    return pos, vel, quat, angvel, forces_motor, forces_cmd
 
 @pytest.mark.unit
 def test_symbolic2numeric():
     """Tests if casadi numeric prediction is the same as the numpy one."""
+    pos, vel, quat, angvel, forces_motor, forces_cmd = create_rnd_states_inputs()
+
     for method in lsy_models.numeric.methods:
         f_numeric = lsy_models.numeric.model_dynamics("cf2x-", method)
         f_symbolic2numeric = lsy_models.symbolic.model_dynamics("cf2x-", method)
@@ -33,6 +41,8 @@ def test_symbolic2numeric():
 @pytest.mark.unit
 def test_numeric_batching():
     """Tests if batching works and if the results are identical to the non-batched version."""
+    pos, vel, quat, angvel, forces_motor, forces_cmd = create_rnd_states_inputs(N=N)
+    
     for method in lsy_models.numeric.methods:
         f_numeric = lsy_models.numeric.model_dynamics("cf2x-", method)
         
@@ -55,10 +65,32 @@ def test_numeric_batching():
 # TODO: test for numpy and jax
 @pytest.mark.unit
 def test_numeric_arrayAPI():
-    assert True
+    nppos, npvel, npquat, npangvel, npforces_motor, npforces_cmd = create_rnd_states_inputs(N=N)
+    jppos, jpvel, jpquat  = jp.array(nppos), jp.array(npvel), jp.array(npquat), 
+    jpangvel, jpforces_motor, jpforces_cmd = jp.array(npangvel), jp.array(npforces_motor), jp.array(npforces_cmd)
+
+    for method in lsy_models.numeric.methods:
+        f_numeric = lsy_models.numeric.model_dynamics("cf2x-", method)
+
+        npresults = f_numeric(nppos, npvel, npquat, npangvel, npforces_motor, npforces_cmd)
+        jpresults = f_numeric(jppos, jpvel, jpquat, jpangvel, jpforces_motor, jpforces_cmd)
+
+        assert isinstance(npresults[0], np.ndarray)
+        assert isinstance(jpresults[0], jp.ndarray)
+        npresults = np.hstack(npresults)
+        jpresults = jp.hstack(jpresults)
+        assert np.allclose(npresults, jpresults)
 
 # TODO test if external wrench gets applied properly
 @pytest.mark.unit
 def test_external_wrench():
     assert True
 
+
+# TODO test if all possible models work => maybe just restructure and add to method testing
+@pytest.mark.unit
+def test_models():
+    assert True
+
+
+test_numeric_arrayAPI()
