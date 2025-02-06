@@ -84,7 +84,7 @@
     <numeric name="p_vmotor2thrust" data="-0.02427920377129026 0.06433042290821364 -0.026401054210489865 0.006731877887386432"/> <!-- Index is order-->
     <numeric name="p_vmotor2rpm" data="-0.02427920377129026 0.06433042290821364 -0.026401054210489865 0.006731877887386432"/> <!-- Index is order-->
     <numeric name="kf" data="5.785372315422736e-10"/> 
-    <numeric name="km" data="7.94e-12"/> <!-- From old identification!-->
+    <numeric name="km" data="7.94e-12"/> <!-- From old identification! TODO: Replace if possible-->
     <numeric name="kd" data="8.0"/>
 
     <!-- System Idenfication: Simple Model-->

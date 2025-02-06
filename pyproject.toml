@@ -13,11 +13,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
 ]
 
-dependencies = [
-    "jax",
-    "casadi",
-    "numpy",
-]
+dependencies = ["jax", "casadi", "numpy"]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0.0", "pytest-cov", "pytest-timeout"]
@@ -55,7 +51,7 @@ exclude = [
 
 line-length = 100
 indent-width = 4
-target-version = "py38"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "D", "TCH", "ANN"]
@@ -67,8 +63,6 @@ unfixable = []
 "benchmark/*" = ["D100", "D103"]
 "tests/*" = ["D100", "D103", "D104"]
 "examples/*" = ["D100", "D103"]
-# TODO: Remove once everything is stable and document
-"crazyflow/*" = ["D100", "D101", "D102", "D104", "D107"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

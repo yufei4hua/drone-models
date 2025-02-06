@@ -43,27 +43,40 @@ def test_symbolic2numeric():
             assert np.allclose(x_dot_numeric, x_dot_symbolic2numeric)
 
 @pytest.mark.unit
-def test_numeric_batching():
+@pytest.mark.parametrize("model", models.available_models)
+def test_numeric_batching(model: str):
     """Tests if batching works and if the results are identical to the non-batched version."""
     pos, vel, quat, angvel, forces_motor, forces_cmd = create_rnd_states_inputs(N=N)
-    
-    for model in models.available_models:
-        f_numeric = models.dynamics(model, "cf2x-")
-        
-        batched = f_numeric(pos, vel, quat, angvel, forces_motor, forces_cmd)
-        batched_1 = [] # testing with batch size 1 (has led to problems earlier)
-        non_batched = []
 
-        for i in range(N):
-            batched_1.append(np.hstack(f_numeric(pos[None,i], vel[None,i], quat[None,i], angvel[None,i], forces_motor[None,i], forces_cmd[None,i])))
-            non_batched.append(np.concat(f_numeric(pos[i], vel[i], quat[i], angvel[i], forces_motor[i], forces_cmd[i])))
+    f_numeric = models.dynamics(model, "cf2x-")
 
-        batched = np.hstack(batched)
-        batched_1 = np.vstack(batched_1)
-        non_batched = np.array(non_batched)
+    batched = f_numeric(pos, vel, quat, angvel, forces_motor, forces_cmd)
+    batched_1 = []  # testing with batch size 1 (has led to problems earlier)
+    non_batched = []
 
-        assert np.allclose(batched, batched_1)
-        assert np.allclose(batched, non_batched)
+    for i in range(N):
+        batched_1.append(
+            np.hstack(
+                f_numeric(
+                    pos[None, i],
+                    vel[None, i],
+                    quat[None, i],
+                    angvel[None, i],
+                    forces_motor[None, i],
+                    forces_cmd[None, i],
+                )
+            )
+        )
+        non_batched.append(
+            np.concat(f_numeric(pos[i], vel[i], quat[i], angvel[i], forces_motor[i], forces_cmd[i]))
+        )
+
+    batched = np.hstack(batched)
+    batched_1 = np.vstack(batched_1)
+    non_batched = np.array(non_batched)
+
+    assert np.allclose(batched, batched_1), "Batching failed for batch size 1"
+    assert np.allclose(batched, non_batched), "Non-batched and batched results are not the same"
 
 
 # TODO: test for numpy and jax
@@ -75,9 +88,10 @@ def test_numeric_arrayAPI():
 
     for model in models.available_models:
         f_numeric = models.dynamics(model, "cf2x-")
+        f_jit_numeric = jax.jit(f_numeric)
 
         npresults = f_numeric(nppos, npvel, npquat, npangvel, npforces_motor, npforces_cmd)
-        jpresults = f_numeric(jppos, jpvel, jpquat, jpangvel, jpforces_motor, jpforces_cmd)
+        jpresults = f_jit_numeric(jppos, jpvel, jpquat, jpangvel, jpforces_motor, jpforces_cmd)
 
         assert isinstance(npresults[0], np.ndarray)
         assert isinstance(jpresults[0], jp.ndarray)

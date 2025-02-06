@@ -19,9 +19,9 @@ def dynamics(model: str, config: str, symbolic: bool = False) -> callable:
     """
     match config: # TODO make constants in jp or np
         case "cf2x-":
-            C = const.Constants.create("data/cf2x_-B250.xml")
+            C = const.Constants.from_file("data/cf2x_-B250.xml")
         case "cf2x+":
-            C = const.Constants.create("data/cf2x_+B250.xml")
+            C = const.Constants.from_file("data/cf2x_+B250.xml")
         case _:
             raise ValueError(f"Drone config '{config}' is not supported")
         
