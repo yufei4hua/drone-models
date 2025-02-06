@@ -6,20 +6,25 @@ import pytest
 
 import lsy_models.utils.rotation as R
 
-tol = 1e-6 # Since Jax by default works with 32 bit, the precision is worse
+tol = 1e-6  # Since Jax by default works with 32 bit, the precision is worse
 
-def create_uniform_quats(n=100, range=10) -> list:
+
+def create_uniform_quats(N: int = 100, scale: float = 10) -> list:
     """Creates an (n, 4) list with random quaternions."""
     # larger range because the function should be able to handle wrong length quaternions
-    quats = np.random.uniform(-np.array([1,1,1,1])*range, np.array([1,1,1,1])*range, size=(n,4)) 
+    quats = np.random.uniform(
+        -np.array([1, 1, 1, 1]) * scale, np.array([1, 1, 1, 1]) * scale, size=(N, 4)
+    )
     return quats.tolist()
+
 
 def create_lock_quats() -> list:
     """Create the quaternions which would lead to gimbal lock in rpy represenation."""
     quats = [
-            [1,1,1,1], # TODO fill in all the gimbal lock quaternions
-            ]
+        [1, 1, 1, 1]  # TODO fill in all the gimbal lock quaternions
+    ]
     return quats
+
 
 @pytest.mark.unit
 def test_rot_from_quat():
@@ -40,4 +45,4 @@ def test_rot_from_quat():
 @pytest.mark.unit
 def test_rot_from_euler():
     """Testing Quaternion to Euler angle with individual arrays."""
-    ... # TODO
+    ...  # TODO

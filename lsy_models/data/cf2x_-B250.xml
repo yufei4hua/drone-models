@@ -1,38 +1,38 @@
 <mujoco model="cf2">
-  <compiler inertiafromgeom="false" meshdir="assets" autolimits="true"/>
-  <include file="assets.xml"/>
-  
+  <compiler inertiafromgeom="false" meshdir="assets" autolimits="true" />
+  <include file="assets.xml" />
+
   <default>
     <default class="cf2">
       <default class="visual">
-        <geom group="2" type="mesh" contype="0" conaffinity="0"/>
+        <geom group="2" type="mesh" contype="0" conaffinity="0" />
       </default>
       <default class="collision">
-        <geom group="3" condim="1"/>
+        <geom group="3" condim="1" />
       </default>
-      <site group="5"/>
+      <site group="5" />
     </default>
   </default>
 
   <worldbody>
     <body name="drone" pos="0 0 0.05" childclass="cf2">
-      <inertial pos="0.0 0.0 0.0" mass="0.027" diaginertia="2.3951e-5 2.3951e-5 3.2347e-5"/>
-      <camera name="track" pos="-1 0 .5" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
-      <geom mesh="cf2_0" material="propeller_plastic" class="visual"/>
-      <geom mesh="cf2_1" material="medium_gloss_plastic" class="visual"/>
-      <geom mesh="cf2_2" material="polished_gold" class="visual"/>
-      <geom mesh="cf2_3" material="polished_plastic" class="visual"/>
-      <geom mesh="cf2_4" material="burnished_chrome" class="visual"/>
-      <geom mesh="cf2_5" material="body_frame_plastic" class="visual"/>
-      <geom mesh="cf2_6" material="white" class="visual"/>
+      <inertial pos="0.0 0.0 0.0" mass="0.027" diaginertia="2.3951e-5 2.3951e-5 3.2347e-5" />
+      <camera name="track" pos="-1 0 .5" xyaxes="0 -1 0 1 0 2" mode="trackcom" />
+      <geom mesh="cf2_0" material="propeller_plastic" class="visual" />
+      <geom mesh="cf2_1" material="medium_gloss_plastic" class="visual" />
+      <geom mesh="cf2_2" material="polished_gold" class="visual" />
+      <geom mesh="cf2_3" material="polished_plastic" class="visual" />
+      <geom mesh="cf2_4" material="burnished_chrome" class="visual" />
+      <geom mesh="cf2_5" material="body_frame_plastic" class="visual" />
+      <geom mesh="cf2_6" material="white" class="visual" />
       <!-- Collision geometry is estimated based on the visual mesh. We use a sphere for maximum
        computational efficiency with larger swarms. -->
-      <geom type="sphere" size="0.055" class="collision" name="col"/>
-      <site name="CoM"/>
-      <site name="motor0" pos="0.0325 -0.0325 0.0"/>
-      <site name="motor1" pos="-0.0325 -0.0325 0.0"/>
-      <site name="motor2" pos="-0.0325 0.0325 0.0"/>
-      <site name="motor3" pos="0.0325 0.0325 0.0"/>
+      <geom type="sphere" size="0.055" class="collision" name="col" />
+      <site name="CoM" />
+      <site name="motor0" pos="0.0325 -0.0325 0.0" />
+      <site name="motor1" pos="-0.0325 -0.0325 0.0" />
+      <site name="motor2" pos="-0.0325 0.0325 0.0" />
+      <site name="motor3" pos="0.0325 0.0325 0.0" />
     </body>
   </worldbody>
 
@@ -42,14 +42,14 @@
   the controller simulation for proper clipping. 
   -->
   <actuator>
-    <motor gear="0 0 1 0 0 0" site="motor0" name="motor0_force"/>
-    <motor gear="0 0 1 0 0 0" site="motor1" name="motor1_force"/>
-    <motor gear="0 0 1 0 0 0" site="motor2" name="motor2_force"/>
-    <motor gear="0 0 1 0 0 0" site="motor3" name="motor3_force"/>
-    <motor gear="0 0 0 0 0 1" site="motor0" name="motor0_torque"/>
-    <motor gear="0 0 0 0 0 1" site="motor1" name="motor1_torque"/>
-    <motor gear="0 0 0 0 0 1" site="motor2" name="motor2_torque"/>
-    <motor gear="0 0 0 0 0 1" site="motor3" name="motor3_torque"/>
+    <motor gear="0 0 1 0 0 0" site="motor0" name="motor0_force" />
+    <motor gear="0 0 1 0 0 0" site="motor1" name="motor1_force" />
+    <motor gear="0 0 1 0 0 0" site="motor2" name="motor2_force" />
+    <motor gear="0 0 1 0 0 0" site="motor3" name="motor3_force" />
+    <motor gear="0 0 0 0 0 1" site="motor0" name="motor0_torque" />
+    <motor gear="0 0 0 0 0 1" site="motor1" name="motor1_torque" />
+    <motor gear="0 0 0 0 0 1" site="motor2" name="motor2_torque" />
+    <motor gear="0 0 0 0 0 1" site="motor3" name="motor3_torque" />
   </actuator>
 
   <!-- Model Parameters
@@ -61,44 +61,54 @@
   -->
   <custom>
     <!-- Physical Parameters-->
-    <numeric name="gravity" data="9.807"/> <!-- Munich, Germany-->
-    <numeric name="mass" data="0.03454"/> 
-    <!--numeric name="J" data="1.4e-5 0.0    0.0 
+    <numeric name="gravity" data="9.807" /> <!-- Munich, Germany-->
+    <numeric name="mass" data="0.03454" />
+    <!--<numeric name="J" data="1.4e-5 0.0    0.0 
                             0.0    1.4e-5 0.0
-                            0.0    0.0    2.17e-5"/--> <!-- From IROS 2022 -->
+                            0.0    0.0    2.17e-5"/>--> <!-- From IROS 2022 -->
     <numeric name="J" data="1.68e-5 0.0    0.0 
                             0.0    1.68e-5 0.0
-                            0.0    0.0    2.98e-5"/> <!-- From Förster B.S. thesis -->
-    <!-- Length of the arm = distance of motor in "+"" config => in "x" config use arm/sqrt(2) -->
-    <numeric name="arm" data="0.046"/>
-    <numeric name="prop_radius" data="2.31348e-2"/>
+                            0.0    0.0    2.98e-5" /> <!-- From Förster B.S. thesis -->
+    <!-- Distance of motor from centre of mass 
+         in x configuration, it's 1/sqrt(2) smaller 
+         arm "+" = 0.046 (measured); arm "x" = 0.03253 (rounded)-->
+    <numeric name="arm" data="0.03253" />
+    <!-- Matrix on how to mix the forces into torques, different for "x" and "+" config-->
+    <numeric name="mix_matrix" data="0.5 -0.5 1 
+                                     0.5 0.5 1 
+                                     -0.5 0.5 1 
+                                     -0.5 -0.5 1" />
+    <numeric name="prop_radius" data="2.31348e-2" />
 
     <!-- Motors and Thrust-->
-    <!-- Motors and Thrust-->
-    <numeric name="PWM_MIN" data="20000.0"/>
-    <numeric name="PWM_MAX" data="65535.0"/>
-    <numeric name="THRUST_MIN" data="0.02"/> <!-- in N, per motor-->
-    <numeric name="THRUST_MAX" data="0.1125"/> <!-- in N, per motor-->
-    <numeric name="THRUST_TAU" data="8.0"/> 
-    <numeric name="VMOTOR_MIN" data="1.0"/> <!-- in V-->
-    <numeric name="VMOTOR_MAX" data="2.9033868877242774"/> <!-- in V-->
-    <numeric name="p_vmotor2thrust" data="-0.014277758669699159 0.04615310129202505 -0.01792897132252934 0.00588008743242753"/> <!-- Index is order-->
-    <numeric name="p_vmotor2rpm" data="2784.4976538987285 6704.125933116105"/> <!-- Index is order-->
-    <numeric name="kf" data="8.704692314240094e-10"/> 
-    <numeric name="km" data="7.94e-12"/> <!-- From old identification!-->
-    <numeric name="kd" data="8.0"/>
+    <numeric name="PWM_MIN" data="20000.0" />
+    <numeric name="PWM_MAX" data="65535.0" />
+    <numeric name="THRUST_MIN" data="0.02" /> <!-- in N, per motor-->
+    <numeric name="THRUST_MAX" data="0.1125" /> <!-- in N, per motor-->
+    <numeric name="THRUST_TAU" data="8.0" />
+    <numeric name="VMOTOR_MIN" data="1.0" /> <!-- in V-->
+    <numeric name="VMOTOR_MAX" data="2.9958502702420544" /> <!-- in V-->
+    <numeric name="p_vmotor2thrust"
+      data="-0.02427920377129026 0.06433042290821364 -0.026401054210489865 0.006731877887386432" /> <!--
+    Index is order-->
+    <numeric name="p_vmotor2rpm"
+      data="-0.02427920377129026 0.06433042290821364 -0.026401054210489865 0.006731877887386432" /> <!--
+    Index is order-->
+    <numeric name="kf" data="5.785372315422736e-10" />
+    <numeric name="km" data="7.94e-12" /> <!-- From old identification! TODO: Replace if possible-->
+    <numeric name="kd" data="8.0" />
 
     <!-- System Idenfication: Simple Model-->
-    <numeric name="SI_roll" data="-3.96 4.08"/>
-    <numeric name="SI_pitch" data="-6.00 6.21"/>
-    <numeric name="SI_yaw" data="0.0 0.0"/> <!-- Not Identified!-->
+    <numeric name="SI_roll" data="-3.96 4.08" />
+    <numeric name="SI_pitch" data="-6.00 6.21" />
+    <numeric name="SI_yaw" data="0.0 0.0" /> <!-- Not Identified!-->
     <!-- Uses the same parameters for acc-->
 
     <!-- System Identification: Double Integrator Model-->
-    <numeric name="DI_roll" data="-99.94 -13.3 84.73"/>
-    <numeric name="DI_pitch" data="-130.3 -16.33 119.3"/>
-    <numeric name="DI_yaw" data="0.0 0.0 0.0"/>  <!-- Not Identified!-->
-    <numeric name="DI_acc" data="20.907574256269616 3.653687545690674"/>
+    <numeric name="DI_roll" data="-99.94 -13.3 84.73" />
+    <numeric name="DI_pitch" data="-130.3 -16.33 119.3" />
+    <numeric name="DI_yaw" data="0.0 0.0 0.0" />  <!-- Not Identified!-->
+    <numeric name="DI_acc" data="20.907574256269616 3.653687545690674" />
 
   </custom>
 

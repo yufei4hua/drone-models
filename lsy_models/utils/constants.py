@@ -16,15 +16,18 @@ if TYPE_CHECKING:
 @dataclass
 class Constants:
     """This is a dataclass for all necessary constants in the models."""
+
     GRAVITY: np.floating
     GRAVITY_VEC: NDArray[np.floating]
     MASS: np.floating
     J: NDArray[np.floating]
     J_inv: NDArray[np.floating]
     L: np.floating
+    MIX_MATRIX: NDArray[np.floating]
+    SIGN_MATRIX: NDArray[np.floating]
+
     PWM_MIN: np.floating
     PWM_MAX: np.floating
-
     KF: np.floating
     KM: np.floating
     KD: np.floating
@@ -45,28 +48,32 @@ class Constants:
     DI_PARAMS: NDArray[np.floating]
     DI_ACC: NDArray[np.floating]
 
+    available_configs: tuple[str] = ("cf2x-", "cf2x+")
+
     @classmethod
     def from_file(cls, path: str) -> Constants:
         """Creates constants based on the xml file at the given location.
-        
+
         The constants are supposed to be under the costum/numeric category.
         """
         # Constants
         drone_path = Path(__file__).parents[1] / path
         # read in all parameters from xml
-        params = ET.parse(drone_path).findall(".//custom/numeric") 
+        params = ET.parse(drone_path).findall(".//custom/numeric")
         # create a dict from parameters containing array of floats
-        params = {p.get("name"): np.array(list(map(float, p.get("data").split()))) for p in params} 
+        params = {p.get("name"): np.array(list(map(float, p.get("data").split()))) for p in params}
 
         GRAVITY = params["gravity"][0]
-        GRAVITY_VEC = np.array([0,0,-GRAVITY])
+        GRAVITY_VEC = np.array([0, 0, -GRAVITY])
         MASS = params["mass"][0]
-        J = params["J"].reshape((3,3))
+        J = params["J"].reshape((3, 3))
         J_inv = np.linalg.inv(J)
         L = params["arm"][0]
+        MIX_MATRIX = params["mix_matrix"].reshape((4, 3))
+        SIGN_MATRIX = np.sign(MIX_MATRIX)
+
         PWM_MIN = params["PWM_MIN"][0]
         PWM_MAX = params["PWM_MAX"][0]
-
         KF = params["kf"][0]
         KM = params["km"][0]
         KD = params["kd"][0]
@@ -78,7 +85,7 @@ class Constants:
         SI_PITCH = params["SI_pitch"]
         SI_YAW = params["SI_yaw"]
         SI_PARAMS = np.vstack((SI_ROLL, SI_PITCH, SI_YAW))
-        SI_ACC = params["DI_acc"] # same parameters for both models
+        SI_ACC = params["DI_acc"]  # same parameters for both models
 
         # System Identification parameters for the double integrator (DI) model
         DI_ROLL = params["DI_roll"]
@@ -87,6 +94,44 @@ class Constants:
         DI_PARAMS = np.vstack((DI_ROLL, DI_PITCH, DI_YAW))
         DI_ACC = params["DI_acc"]
 
-        return cls(GRAVITY, GRAVITY_VEC, MASS, J, J_inv, L, PWM_MIN, PWM_MAX, KF, KM, KD, THRUST_MIN, THRUST_MAX, 
-                   SI_ROLL, SI_PITCH, SI_YAW, SI_PARAMS, SI_ACC, 
-                   DI_ROLL, DI_PITCH, DI_YAW, DI_PARAMS, DI_ACC)
+        return cls(
+            GRAVITY,
+            GRAVITY_VEC,
+            MASS,
+            J,
+            J_inv,
+            L,
+            MIX_MATRIX,
+            SIGN_MATRIX,
+            PWM_MIN,
+            PWM_MAX,
+            KF,
+            KM,
+            KD,
+            THRUST_MIN,
+            THRUST_MAX,
+            SI_ROLL,
+            SI_PITCH,
+            SI_YAW,
+            SI_PARAMS,
+            SI_ACC,
+            DI_ROLL,
+            DI_PITCH,
+            DI_YAW,
+            DI_PARAMS,
+            DI_ACC,
+        )
+
+    @classmethod
+    def from_config(cls, config: str) -> Constants:
+        """Creates constants based on the give configuration.
+
+        For available configs see Constants.available_configs
+        """
+        match config:
+            case "cf2x-":
+                return Constants.from_file("data/cf2x_-B250.xml")
+            case "cf2x+":
+                return Constants.from_file("data/cf2x_+B250.xml")
+            case _:
+                raise ValueError(f"Drone config '{config}' is not supported")
