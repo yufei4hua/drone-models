@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from functools import partial
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -15,31 +14,6 @@ if TYPE_CHECKING:
     from types import FunctionType
 
     from numpy.typing import NDArray
-
-# C = const.Constants.create("data/cf2x_-B250.xml")
-
-models = ["cf2x-", "cf2x+"]
-methods = ["first_principles"] # available methods, used in testing
-
-# TODO move model dynamics from numeric and symbolic into one file
-def model_dynamics(model: str, method: str) -> callable:
-    match model: # TODO make constants in jp or np
-        case "cf2x+":
-            C = const.Constants.create("data/cf2x_-B250.xml")
-        case "cf2x-":
-            C = const.Constants.create("data/cf2x_+B250.xml")
-        case _:
-            raise ValueError(f"Model '{model}' is not supported")
-        
-    match method:
-        case "first_principles":
-            return partial(f_first_principles, C=C)
-        case "fit_SI":
-            raise ValueError(f"Method '{method}' is not supported") # TODO
-        case "fit_DI":
-            raise ValueError(f"Method '{method}' is not supported") # TODO
-        case _:
-            raise ValueError(f"Method '{method}' is not supported")
 
 def f_first_principles(pos: NDArray[np.floating], vel: NDArray[np.floating], quat: NDArray[np.floating], angvel: NDArray[np.floating],
                  forces_motor: NDArray[np.floating], forces_cmd: NDArray[np.floating], C: const.Constants, 

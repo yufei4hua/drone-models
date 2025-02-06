@@ -6,15 +6,15 @@ import jax.numpy as jp
 import numpy as np
 import pytest
 
-import lsy_models.numeric
-import lsy_models.symbolic
+import lsy_models.models as models
 
 # For all tests to pass, we need the same precsion in jax as in np
 jax.config.update("jax_enable_x64", True)
 
 N = 1000
 
-def create_rnd_states_inputs(N=1000):
+def create_rnd_states_inputs(N=1000) -> np.ndarray: # TODO return type
+    """TODO."""
     pos = np.random.uniform(-5, 5, (N,3))
     vel = np.random.uniform(-5, 5, (N,3))
     quat = np.random.uniform(-5, 5, (N,4)) # all rotation libraries should be normalizing automatically
@@ -28,14 +28,19 @@ def test_symbolic2numeric():
     """Tests if casadi numeric prediction is the same as the numpy one."""
     pos, vel, quat, angvel, forces_motor, forces_cmd = create_rnd_states_inputs()
 
-    for method in lsy_models.numeric.methods:
-        f_numeric = lsy_models.numeric.model_dynamics("cf2x-", method)
-        f_symbolic2numeric = lsy_models.symbolic.model_dynamics("cf2x-", method)
+    for model in models.available_models:
+        f_numeric = models.dynamics(model, "cf2x-")
+        f_symbolic2numeric = models.dynamics(model, "cf2x-", symbolic=True)
 
         for i in range(N): # casadi only supports non batched calls
             x_dot_numeric = f_numeric(pos[i], vel[i], quat[i], angvel[i], forces_motor[i], forces_cmd[i])
             x_dot_numeric = np.concat(x_dot_numeric)
-            x_dot_symbolic2numeric = np.array(f_symbolic2numeric(pos[i], vel[i], quat[i], angvel[i], forces_motor[i], forces_cmd[i])).squeeze()
+            
+            X = np.concat((pos[i], quat[i], vel[i], angvel[i], forces_motor[i]))
+            print(X)
+            U = forces_cmd[i]
+            x_dot_symbolic2numeric = np.array(f_symbolic2numeric(X, U)).squeeze()
+            print(f"diff = {x_dot_numeric-x_dot_symbolic2numeric}")
             assert np.allclose(x_dot_numeric, x_dot_symbolic2numeric)
 
 @pytest.mark.unit
@@ -43,8 +48,8 @@ def test_numeric_batching():
     """Tests if batching works and if the results are identical to the non-batched version."""
     pos, vel, quat, angvel, forces_motor, forces_cmd = create_rnd_states_inputs(N=N)
     
-    for method in lsy_models.numeric.methods:
-        f_numeric = lsy_models.numeric.model_dynamics("cf2x-", method)
+    for model in models.available_models:
+        f_numeric = models.dynamics(model, "cf2x-")
         
         batched = f_numeric(pos, vel, quat, angvel, forces_motor, forces_cmd)
         batched_1 = [] # testing with batch size 1 (has led to problems earlier)
@@ -69,8 +74,8 @@ def test_numeric_arrayAPI():
     jppos, jpvel, jpquat  = jp.array(nppos), jp.array(npvel), jp.array(npquat), 
     jpangvel, jpforces_motor, jpforces_cmd = jp.array(npangvel), jp.array(npforces_motor), jp.array(npforces_cmd)
 
-    for method in lsy_models.numeric.methods:
-        f_numeric = lsy_models.numeric.model_dynamics("cf2x-", method)
+    for model in models.available_models:
+        f_numeric = models.dynamics(model, "cf2x-")
 
         npresults = f_numeric(nppos, npvel, npquat, npangvel, npforces_motor, npforces_cmd)
         jpresults = f_numeric(jppos, jpvel, jpquat, jpangvel, jpforces_motor, jpforces_cmd)
@@ -87,9 +92,9 @@ def test_external_wrench():
     assert True
 
 
-# TODO test if all possible models work => maybe just restructure and add to method testing
+# TODO test if all possible configs work => maybe just restructure and add to method testing
 @pytest.mark.unit
-def test_models():
+def test_configs():
     assert True
 
 

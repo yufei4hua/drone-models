@@ -10,29 +10,9 @@ import numpy as np
 import lsy_models.utils.const as const
 import lsy_models.utils.rotation as R
 
-# C = const.Constants.create("data/cf2x_-B250.xml")
 
-# TODO move model dynamics from numeric and symbolic into one file
-def model_dynamics(model: str, method: str) -> callable:
-    match model: # TODO make constants in jp or np
-        case "cf2x+":
-            C = const.Constants.create("data/cf2x_-B250.xml")
-        case "cf2x-":
-            C = const.Constants.create("data/cf2x_+B250.xml")
-        case _:
-            raise ValueError(f"Model '{model}' is not supported")
-        
-    match method:
-        case "first_principles":
-            return first_principles(C)
-        case "fit_SI":
-            raise ValueError(f"Method '{method}' is not supported") # TODO
-        case "fit_DI":
-            raise ValueError(f"Method '{method}' is not supported") # TODO
-        case _:
-            raise ValueError(f"Method '{method}' is not supported")
-
-def first_principles(C):
+def first_principles(C) -> cs.Function:
+    """TODO."""
     nx, nu = 13, 4
 
     # States
@@ -66,12 +46,12 @@ def first_principles(C):
     f2_cmd = cs.MX.sym('f2_cmd')
     f3_cmd = cs.MX.sym('f3_cmd')
     f4_cmd = cs.MX.sym('f4_cmd')
-    forces_cmd = cs.vertcat(f1_cmd, f2_cmd, f3_cmd, f4_cmd) # U
+    U = cs.vertcat(f1_cmd, f2_cmd, f3_cmd, f4_cmd) # U
 
 
     # Defining the dynamics function
     # Thrust dynamics
-    forces_motor_dot = C.KD*(forces_cmd-forces_motor)
+    forces_motor_dot = C.KD*(U-forces_motor)
     # Creating force vector 
     forces_motor_vec = cs.vertcat(0,0,cs.sum1(forces_motor)) # TODO check if sum1 or sum2
     torque_motor_vec = cs.vertcat(
@@ -86,11 +66,11 @@ def first_principles(C):
 
     # Rotational equation of motion
     xi = cs.vertcat( cs.horzcat(0, -angvel.T), cs.horzcat(angvel, -cs.skew(angvel)) )
-    print(xi)
     quat_dot = 0.5*(xi @ quat)
     angvel_dot = C.J_inv @ (torque_motor_vec - cs.cross(angvel, C.J@angvel)) # TODO add disturbance torque (rotated!)
 
     X_dot = cs.vertcat(pos_dot, vel_dot, quat_dot, angvel_dot, forces_motor_dot)
     Y = cs.vertcat(pos, quat)
 
-    return cs.Function('first_principles', [pos, vel, quat, angvel, forces_motor, forces_cmd], [X_dot])
+    return X_dot, X, U, Y
+    # return cs.Function('first_principles', [pos, vel, quat, angvel, forces_motor, forces_cmd], [X_dot])
