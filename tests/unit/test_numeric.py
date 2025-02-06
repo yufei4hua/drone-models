@@ -5,7 +5,8 @@ import jax.numpy as jp
 import numpy as np
 import pytest
 
-import lsy_models.models as models  # TODO import everything necessary directly
+from lsy_models.models import available_models, dynamic_numeric_from_symbolic, dynamics_numeric
+from lsy_models.utils.constants import Constants
 
 # For all tests to pass, we need the same precsion in jax as in np
 jax.config.update("jax_enable_x64", True)
@@ -14,7 +15,7 @@ N = 1000
 
 
 def create_rnd_states_inputs(N: int = 1000) -> np.ndarray:  # TODO return type
-    """TODO."""
+    """Creates N random states and inputs."""
     pos = np.random.uniform(-5, 5, (N, 3))
     vel = np.random.uniform(-5, 5, (N, 3))
     quat = np.random.uniform(
@@ -27,35 +28,39 @@ def create_rnd_states_inputs(N: int = 1000) -> np.ndarray:  # TODO return type
 
 
 @pytest.mark.unit
-def test_symbolic2numeric():
+@pytest.mark.parametrize("model", available_models)
+@pytest.mark.parametrize("config", Constants.available_configs)
+def test_symbolic2numeric(model: str, config: str):
     """Tests if casadi numeric prediction is the same as the numpy one."""
     pos, vel, quat, angvel, forces_motor, forces_cmd = create_rnd_states_inputs()
 
-    for model in models.available_models:
-        f_numeric = models.dynamics(model, "cf2x-")
-        f_symbolic2numeric = models.dynamics(model, "cf2x-", symbolic=True)
+    f_numeric = dynamics_numeric(model, config)
+    f_symbolic2numeric = dynamic_numeric_from_symbolic(model, config)
 
-        for i in range(N):  # casadi only supports non batched calls
-            x_dot_numeric = f_numeric(
-                pos[i], quat[i], vel[i], angvel[i], forces_motor[i], forces_cmd[i]
-            )
-            x_dot_numeric = np.concat(x_dot_numeric)
+    for i in range(N):  # casadi only supports non batched calls
+        x_dot_numeric = f_numeric(
+            pos[i], quat[i], vel[i], angvel[i], forces_motor[i], forces_cmd[i]
+        )
+        x_dot_numeric = np.concat(x_dot_numeric)
 
-            X = np.concat((pos[i], quat[i], vel[i], angvel[i], forces_motor[i]))
-            print(X)
-            U = forces_cmd[i]
-            x_dot_symbolic2numeric = np.array(f_symbolic2numeric(X, U)).squeeze()
-            print(f"diff = {x_dot_numeric - x_dot_symbolic2numeric}")
-            assert np.allclose(x_dot_numeric, x_dot_symbolic2numeric), "TODO description"
+        X = np.concat((pos[i], quat[i], vel[i], angvel[i], forces_motor[i]))
+        print(X)
+        U = forces_cmd[i]
+        x_dot_symbolic2numeric = np.array(f_symbolic2numeric(X, U)).squeeze()
+        print(f"diff = {x_dot_numeric - x_dot_symbolic2numeric}")
+        assert np.allclose(x_dot_numeric, x_dot_symbolic2numeric), (
+            "Symbolic and numeric model have different output"
+        )
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("model", models.available_models)  # TODO parameterize config
-def test_numeric_batching(model: str):
+@pytest.mark.parametrize("model", available_models)
+@pytest.mark.parametrize("config", Constants.available_configs)
+def test_numeric_batching(model: str, config: str):
     """Tests if batching works and if the results are identical to the non-batched version."""
     pos, vel, quat, angvel, forces_motor, forces_cmd = create_rnd_states_inputs(N=N)
 
-    f_numeric = models.dynamics(model, "cf2x-")
+    f_numeric = dynamics_numeric(model, config)
 
     batched = f_numeric(pos, quat, vel, angvel, forces_motor, forces_cmd)
     batched_1 = []  # testing with batch size 1 (has led to problems earlier)
@@ -88,7 +93,10 @@ def test_numeric_batching(model: str):
 
 # TODO: test for numpy and jax
 @pytest.mark.unit
-def test_numeric_arrayAPI():
+@pytest.mark.parametrize("model", available_models)
+@pytest.mark.parametrize("config", Constants.available_configs)
+def test_numeric_arrayAPI(model: str, config: str):
+    """Tests is the functions are jitable and if the results are identical to the numpy ones."""
     nppos, npvel, npquat, npangvel, npforces_motor, npforces_cmd = create_rnd_states_inputs(N=N)
     jppos, jpvel, jpquat = jp.array(nppos), jp.array(npvel), jp.array(npquat)
     jpangvel, jpforces_motor, jpforces_cmd = (
@@ -97,27 +105,20 @@ def test_numeric_arrayAPI():
         jp.array(npforces_cmd),
     )
 
-    for model in models.available_models:
-        f_numeric = models.dynamics(model, "cf2x-")
-        f_jit_numeric = jax.jit(f_numeric)
+    f_numeric = dynamics_numeric(model, config)
+    f_jit_numeric = jax.jit(f_numeric)
 
-        npresults = f_numeric(nppos, npquat, npvel, npangvel, npforces_motor, npforces_cmd)
-        jpresults = f_jit_numeric(jppos, jpquat, jpvel, jpangvel, jpforces_motor, jpforces_cmd)
+    npresults = f_numeric(nppos, npquat, npvel, npangvel, npforces_motor, npforces_cmd)
+    jpresults = f_jit_numeric(jppos, jpquat, jpvel, jpangvel, jpforces_motor, jpforces_cmd)
 
-        assert isinstance(npresults[0], np.ndarray), "TODO description"
-        assert isinstance(jpresults[0], jp.ndarray), "TODO description"
-        npresults = np.hstack(npresults)
-        jpresults = jp.hstack(jpresults)
-        assert np.allclose(npresults, jpresults), "TODO description"
+    assert isinstance(npresults[0], np.ndarray), "Results are not numpy arrays"
+    assert isinstance(jpresults[0], jp.ndarray), "Results are not jax arrays"
+    npresults = np.hstack(npresults)
+    jpresults = jp.hstack(jpresults)
+    assert np.allclose(npresults, jpresults), "numpy and jax results differ"
 
 
 # TODO test if external wrench gets applied properly
 @pytest.mark.unit
 def test_external_wrench():
-    assert True
-
-
-# TODO test if all possible configs work => maybe just restructure and add to method testing
-@pytest.mark.unit
-def test_configs():
     assert True

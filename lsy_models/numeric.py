@@ -32,7 +32,7 @@ def f_first_principles(
 ]:
     """First principles model for a quatrotor.
 
-    The input consists of four forces. TODO more detail.
+    The input consists of four forces in [N]. TODO more detail.
 
     Based on the quaternion model from https://www.dynsyslab.org/wp-content/papercite-data/pdf/mckinnon-robot20.pdf
 
@@ -91,6 +91,48 @@ def f_first_principles(
     ) @ constants.J_inv  # batchable version
 
     return pos_dot, vel_dot, quat_dot, angvel_dot, forces_motor_dot
+
+
+# def f_fitted_DI(
+#     pos: NDArray[np.floating],
+#     quat: NDArray[np.floating],
+#     vel: NDArray[np.floating],
+#     angvel: NDArray[np.floating],
+#     forces_motor: NDArray[np.floating],
+#     RPYT_cmd: NDArray[np.floating],
+#     constants: Constants,
+#     forces_dist: NDArray[np.floating] | None = None,
+#     torques_dist: NDArray[np.floating] | None = None,
+# ) -> tuple[
+#     NDArray[np.floating],
+#     NDArray[np.floating],
+#     NDArray[np.floating],
+#     NDArray[np.floating],
+#     NDArray[np.floating],
+# ]:
+#     """TODO."""
+#     xp = pos.__array_namespace__()
+#     rot = R.from_quat(quat)
+#     euler_angles = rot.as_euler("xyz")
+
+#     # Linear equation of motion
+#     coeff = constants.DI_ACC[0] * RPYT_cmd[..., 3] + constants.DI_ACC[1]
+#     cos_x3 = np.cos(x[:, 3])
+#     sin_x3 = np.sin(x[:, 3])
+#     cos_x4 = np.cos(x[:, 4])
+#     sin_x4 = np.sin(x[:, 4])
+#     cos_x5 = np.cos(x[:, 5])
+#     sin_x5 = np.sin(x[:, 5])
+#     if forces_dist is not None:
+#         force_world_frame = (
+#             forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS + forces_dist
+#         )
+#     else:
+#         force_world_frame = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
+#     pos_dot = vel
+#     vel_dot = force_world_frame / constants.MASS
+
+#     return pos_dot, vel_dot, quat_dot, angvel_dot, forces_motor_dot
 
 
 # f = model_dynamics("cf2x+", "analytical")

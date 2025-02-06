@@ -48,6 +48,7 @@ class Constants:
     DI_PARAMS: NDArray[np.floating]
     DI_ACC: NDArray[np.floating]
 
+    # Configs (used in testing)
     available_configs: tuple[str] = ("cf2x-", "cf2x+")
 
     @classmethod
