@@ -30,10 +30,10 @@ def casadi_quat2matrix(quat: cs.MX) -> cs.MX:
     
     From https://github.com/cmower/spatial-casadi/blob/master/spatial_casadi/spatial.py
     """
-    x = quat[0]
-    y = quat[1]
-    z = quat[2]
-    w = quat[3]
+    x = quat[0] / cs.norm_2(quat)
+    y = quat[1] / cs.norm_2(quat)
+    z = quat[2] / cs.norm_2(quat)
+    w = quat[3] / cs.norm_2(quat)
 
     x2 = x * x
     y2 = y * y
