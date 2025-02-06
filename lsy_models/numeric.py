@@ -78,9 +78,6 @@ def f_first_principles(pos: NDArray[np.floating], vel: NDArray[np.floating], qua
     vel_dot = force_world_frame / C.MASS
 
     # Rotational equation of motion
-    # print(f"angvel.shape={angvel.shape}")
-    # angvel_skew = xp.linalg.cross(xp.reshape(angvel, (-1,1,3)), xp.identity(3) * -1, axis=-1) # creates the skew symmetric matrix
-    # angvel_skew = xp.triu(angvel) - xp.triu(angvel).T
     x, y, z = xp.split(angvel, 3, axis=-1)
     angvel_skew = xp.stack(
             [
@@ -89,9 +86,7 @@ def f_first_principles(pos: NDArray[np.floating], vel: NDArray[np.floating], qua
                 xp.concat((-y, x, xp.zeros_like(x)), axis=-1),
             ],
             axis=-2,
-        )
-    print(f"angvel_skew.shape before squeeze = {angvel_skew.shape}")
-    # angvel_skew = angvel_skew.squeeze() # from jaxsim.math.skew
+        ) #.squeeze() # from jaxsim.math.skew
     xi1 = xp.insert(-angvel, 0, 0, axis=-1) # First line of xi
     xi2 = xp.concat((xp.expand_dims(angvel.T, axis=0).T, -angvel_skew), axis=-1)
     xi = xp.concat((xp.expand_dims(xi1, axis=-2), xi2), axis=-2)
@@ -100,10 +95,7 @@ def f_first_principles(pos: NDArray[np.floating], vel: NDArray[np.floating], qua
     else:
         torques = torques_motor_vec
     quat_dot = 0.5*(xi @ quat[..., None]).squeeze(axis=-1)
-    # quat_dot = 0.5*(quat @ xi)
     angvel_dot = (torques - xp.cross(angvel, angvel@C.J)) @ C.J_inv # batchable version
-
-    # print(f"quat={quat.shape}, quat_dot={quat_dot.shape}, xi={xi.shape}")
 
     return pos_dot, vel_dot, quat_dot, angvel_dot, forces_motor_dot
     
