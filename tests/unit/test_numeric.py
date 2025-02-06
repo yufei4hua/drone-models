@@ -1,6 +1,5 @@
 """Tests of the numeric models."""
 
-import casadi as cs
 import jax
 import jax.numpy as jp
 import numpy as np
@@ -13,7 +12,7 @@ jax.config.update("jax_enable_x64", True)
 
 N = 1000
 
-def create_rnd_states_inputs(N=1000) -> np.ndarray: # TODO return type
+def create_rnd_states_inputs(N: int = 1000) -> np.ndarray: # TODO return type
     """TODO."""
     pos = np.random.uniform(-5, 5, (N,3))
     vel = np.random.uniform(-5, 5, (N,3))
@@ -96,6 +95,3 @@ def test_external_wrench():
 @pytest.mark.unit
 def test_configs():
     assert True
-
-
-test_numeric_arrayAPI()

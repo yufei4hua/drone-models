@@ -5,15 +5,14 @@ https://github.com/middleyuan/safe-control-gym/blob/d5f4f4f1cea112cab84031453b28
 """
 
 import casadi as cs
-import numpy as np
 
 import lsy_models.utils.const as const
 import lsy_models.utils.rotation as R
 
 
-def first_principles(C) -> cs.Function:
-    """TODO."""
-    nx, nu = 13, 4
+def first_principles(C: const.Constants) -> cs.Function:
+    """TODO take from numeric."""
+    # nx, nu = 13, 4
 
     # States
     px = cs.MX.sym('px')

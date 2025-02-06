@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dataclasses import dataclass
-
 import numpy as np
-import xml.etree.ElementTree as ET
-from pathlib import Path
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -16,7 +15,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class Constants:
-    """TODO."""
+    """This is a dataclass for all necessary constants in the models."""
     GRAVITY: np.floating
     GRAVITY_VEC: NDArray[np.floating]
     MASS: np.floating
@@ -47,7 +46,11 @@ class Constants:
     DI_ACC: NDArray[np.floating]
 
     @classmethod
-    def create(cls, path: str):
+    def from_file(cls, path: str) -> Constants:
+        """Creates constants based on the xml file at the given location.
+        
+        The constants are supposed to be under the costum/numeric category.
+        """
         # Constants
         drone_path = Path(__file__).parents[1] / path
         # read in all parameters from xml

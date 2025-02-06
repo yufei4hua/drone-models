@@ -8,25 +8,27 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import jax.numpy as jp
-import numpy as np
 import casadi as cs
+import jax.numpy as jp
 from jax.scipy.spatial.transform import Rotation as JR
 from scipy.spatial.transform import Rotation as R
 
 if TYPE_CHECKING:
+    import numpy as np
     from numpy.typing import NDArray
 
 def from_quat(quat: NDArray[np.floating], scalar_first: bool = False) -> R:
-    if isinstance(quat, np.ndarray):
-        return R.from_quat(quat, scalar_first=scalar_first)
-    if isinstance(quat, jp.ndarray):
+    """Creates a rotation object compatible with the type of the given quat."""
+    if isinstance(quat, jp.ndarray):#
+        if scalar_first:
+            raise ValueError("scalar_first is not supported by jax rotations")
         return JR.from_quat(quat)
-    raise ValueError(f"Expected numpy or jax array, got {type(quat)}")
+    else:
+        return R.from_quat(quat, scalar_first=scalar_first)
 
 
 def casadi_quat2matrix(quat: cs.MX) -> cs.MX:
-    """TODO.
+    """Creates a symbolic rotation matrix based on a symbolic quaternion.
     
     From https://github.com/cmower/spatial-casadi/blob/master/spatial_casadi/spatial.py
     """

@@ -5,21 +5,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
-
 import lsy_models.utils.const as const
 import lsy_models.utils.rotation as R
 
 if TYPE_CHECKING:
-    from types import FunctionType
-
+    import numpy as np
     from numpy.typing import NDArray
 
 def f_first_principles(pos: NDArray[np.floating], vel: NDArray[np.floating], quat: NDArray[np.floating], angvel: NDArray[np.floating],
                  forces_motor: NDArray[np.floating], forces_cmd: NDArray[np.floating], C: const.Constants, 
                  forces_dist: NDArray[np.floating] | None = None, torques_dist: NDArray[np.floating] | None = None
                  ) -> tuple[NDArray[np.floating], NDArray[np.floating], NDArray[np.floating], NDArray[np.floating], NDArray[np.floating]]:
-    """The input consists of four forces. TODO more detail.
+    """First principles model for a quatrotor.
+    
+    The input consists of four forces. TODO more detail.
     
     Based on the quaternion model from https://www.dynsyslab.org/wp-content/papercite-data/pdf/mckinnon-robot20.pdf
 
