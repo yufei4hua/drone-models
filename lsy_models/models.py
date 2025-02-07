@@ -16,13 +16,20 @@ from lsy_models.utils.constants import Constants
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    import numpy as np
     from numpy.typing import NDArray
+
+    from lsy_models.dataclasses import QuadrotorState
 
 # used in testing
 available_models = ["first_principles"]  # , "fitted_SI", "fitted_DI"
+# available_models = ({"name": "first_principles", "continuous": True},
+#                     ...) # TODO
 
 
-def dynamics_numeric(model: str, config: str) -> Callable[[NDArray], tuple]:  # TODO how precise?
+def dynamics_numeric(
+    model: str, config: str
+) -> Callable[[QuadrotorState, NDArray[np.floating]], QuadrotorState]:  # TODO how precise?
     """Creates a numerical dynamics function f(x,u).
 
     Args:
