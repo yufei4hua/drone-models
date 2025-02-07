@@ -76,4 +76,16 @@ def dynamic_numeric_from_symbolic(model: str, config: str) -> Callable[[NDArray,
             raise ValueError(f"Model '{model}' is not supported")
 
 
+def observation_function(
+    state: QuadrotorState, input: NDArray[np.floating]
+) -> NDArray[np.floating]:
+    """Return the observable part of the state.
+
+    This is basically not necessary, since we always get position and orientation
+    from Vicon. However, for sake of completeness, this observation function is added.
+    """
+    xp = state.pos.__array_namespace__()
+    return xp.concat((state.pos, state.quat), axis=-1)
+
+
 # TODO method for a casadi optimizer object
