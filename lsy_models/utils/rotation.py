@@ -17,9 +17,10 @@ if TYPE_CHECKING:
     import numpy as np
     from numpy.typing import NDArray
 
+
 def from_quat(quat: NDArray[np.floating], scalar_first: bool = False) -> R:
     """Creates a rotation object compatible with the type of the given quat."""
-    if isinstance(quat, jp.ndarray):#
+    if isinstance(quat, jp.ndarray):
         if scalar_first:
             raise ValueError("scalar_first is not supported by jax rotations")
         return JR.from_quat(quat)
@@ -27,9 +28,17 @@ def from_quat(quat: NDArray[np.floating], scalar_first: bool = False) -> R:
         return R.from_quat(quat, scalar_first=scalar_first)
 
 
+def from_rotvec(rotvec: NDArray[np.floating], degrees: bool = False) -> R:
+    """Creates a rotation object compativle with the type of the given rotvec."""
+    if isinstance(rotvec, jp.ndarray):
+        return JR.from_rotvec(rotvec, degrees)
+    else:
+        return R.from_rotvec(rotvec, degrees)
+
+
 def casadi_quat2matrix(quat: cs.MX) -> cs.MX:
     """Creates a symbolic rotation matrix based on a symbolic quaternion.
-    
+
     From https://github.com/cmower/spatial-casadi/blob/master/spatial_casadi/spatial.py
     """
     x = quat[0] / cs.norm_2(quat)
@@ -50,21 +59,9 @@ def casadi_quat2matrix(quat: cs.MX) -> cs.MX:
     xw = x * w
 
     matrix = cs.horzcat(
-        cs.vertcat(
-            x2 - y2 - z2 + w2,
-            2.0 * (xy + zw),
-            2.0 * (xz - yw),
-        ),
-        cs.vertcat(
-            2.0 * (xy - zw),
-            -x2 + y2 - z2 + w2,
-            2.0 * (yz + xw),
-        ),
-        cs.vertcat(
-            2.0 * (xz + yw),
-            2.0 * (yz - xw),
-            -x2 - y2 + z2 + w2,
-        ),
+        cs.vertcat(x2 - y2 - z2 + w2, 2.0 * (xy + zw), 2.0 * (xz - yw)),
+        cs.vertcat(2.0 * (xy - zw), -x2 + y2 - z2 + w2, 2.0 * (yz + xw)),
+        cs.vertcat(2.0 * (xz + yw), 2.0 * (yz - xw), -x2 - y2 + z2 + w2),
     )
 
     return matrix
