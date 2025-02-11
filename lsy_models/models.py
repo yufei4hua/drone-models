@@ -16,10 +16,11 @@ from lsy_models.utils.constants import Constants
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    import numpy as np
+    from jax import Array as JaxArray
     from numpy.typing import NDArray
+    from torch import Tensor
 
-    from lsy_models.dataclasses import QuadrotorState
+    Array = NDArray | JaxArray | Tensor
 
 # used in testing
 available_models = ["first_principles"]  # , "fitted_SI", "fitted_DI"
@@ -29,7 +30,10 @@ available_models = ["first_principles"]  # , "fitted_SI", "fitted_DI"
 
 def dynamics_numeric(
     model: str, config: str
-) -> Callable[[QuadrotorState, NDArray[np.floating]], QuadrotorState]:  # TODO how precise?
+) -> Callable[
+    [Array, Array, Array, Array, Array, Array, Array | None, Array | None],
+    tuple[Array, Array, Array, Array, Array | None],
+]:
     """Creates a numerical dynamics function f(x,u).
 
     Args:
@@ -38,6 +42,11 @@ def dynamics_numeric(
 
     Returns:
         A callable which takes the states and input and returns the derivative of the state.
+
+    Warning:
+        Do not use quat_dot directly for integration! Only usage of angvel is mathematically correct.
+        If you still decide to use quat_dot to integrate, ensure unit length!
+        More information https://ahrs.readthedocs.io/en/latest/filters/angular.html
     """
     constants = Constants.from_config(config)
 
@@ -77,15 +86,22 @@ def dynamic_numeric_from_symbolic(model: str, config: str) -> Callable[[NDArray,
 
 
 def observation_function(
-    state: QuadrotorState, input: NDArray[np.floating]
-) -> NDArray[np.floating]:
+    pos: Array,
+    quat: Array,
+    vel: Array,
+    angvel: Array,
+    forces_motor: Array,
+    command: Array,
+    forces_dist: Array | None = None,
+    torques_dist: Array | None = None,
+) -> Array:
     """Return the observable part of the state.
 
     This is basically not necessary, since we always get position and orientation
     from Vicon. However, for sake of completeness, this observation function is added.
     """
-    xp = state.pos.__array_namespace__()
-    return xp.concat((state.pos, state.quat), axis=-1)
+    xp = pos.__array_namespace__()
+    return xp.concat((pos, quat), axis=-1)
 
 
 # TODO method for a casadi optimizer object

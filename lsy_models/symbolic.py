@@ -71,7 +71,7 @@ def first_principles(constants: Constants) -> cs.Function:
         torques_motor_vec - cs.cross(angvel, constants.J @ angvel)
     )  # TODO add disturbance torque (rotated!)
 
-    X_dot = cs.vertcat(pos_dot, vel_dot, quat_dot, angvel_dot, forces_motor_dot)
+    X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, angvel_dot, forces_motor_dot)
     Y = cs.vertcat(pos, quat)
 
     return X_dot, X, U, Y
