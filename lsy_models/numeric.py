@@ -21,9 +21,9 @@ def f_first_principles(
     quat: Array,
     vel: Array,
     angvel: Array,
-    forces_motor: Array,
     command: Array,
     constants: Constants,
+    forces_motor: Array | None = None,
     forces_dist: Array | None = None,
     torques_dist: Array | None = None,
 ) -> tuple[Array, Array, Array, Array, Array | None]:
@@ -45,10 +45,14 @@ def f_first_principles(
     rot = R.from_quat(quat)
 
     # Thrust dynamics
-    forces_motor_dot = constants.KD * (command - forces_motor)  # TODO add dt = 1/200
-    # forces_motor_dot = forces_motor * 0  # Without motor dynamics TODO make motor forces None
-    # Creating force and torque vector
-    forces_motor_tot = xp.sum(forces_motor, axis=-1)
+    if forces_motor is None:
+        forces_motor_dot = None
+        # Creating force and torque vector
+        forces_motor_tot = xp.sum(command, axis=-1)
+    else:
+        forces_motor_dot = constants.KD * (command - forces_motor)  # TODO add dt = 1/200
+        # Creating force and torque vector
+        forces_motor_tot = xp.sum(forces_motor, axis=-1)
     # forces_motor_tot = xp.sum(
     #     command, axis=-1
     # )  # Without motor dynamics TODO make motor forces None

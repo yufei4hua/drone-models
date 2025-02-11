@@ -50,7 +50,9 @@ def test_symbolic2numeric(model: str, config: str):
     f_symbolic2numeric = dynamic_numeric_from_symbolic(model, config)
 
     for i in range(N):  # casadi only supports non batched calls
-        x_dot_numeric = f_numeric(pos[i], quat[i], vel[i], angvel[i], forces_motor[i], commands[i])
+        x_dot_numeric = f_numeric(
+            pos[i], quat[i], vel[i], angvel[i], commands[i], forces_motor=forces_motor[i]
+        )
         x_dot_numeric = np.concat(x_dot_numeric)
 
         X = np.concat((pos[i], quat[i], vel[i], angvel[i], forces_motor[i]))
@@ -73,7 +75,7 @@ def test_numeric_batching(model: str, config: str):
 
     f_numeric = dynamics_numeric(model, config)
 
-    batched = f_numeric(pos, quat, vel, angvel, forces_motor, commands)
+    batched = f_numeric(pos, quat, vel, angvel, commands, forces_motor=forces_motor)
     batched_1 = []  # testing with batch size 1 (has led to problems earlier)
     non_batched = []
 
@@ -85,13 +87,17 @@ def test_numeric_batching(model: str, config: str):
                     quat[None, i],
                     vel[None, i],
                     angvel[None, i],
-                    forces_motor[None, i],
                     commands[None, i],
+                    forces_motor=forces_motor[None, i],
                 )
             )
         )
         non_batched.append(
-            np.concat(f_numeric(pos[i], quat[i], vel[i], angvel[i], forces_motor[i], commands[i]))
+            np.concat(
+                f_numeric(
+                    pos[i], quat[i], vel[i], angvel[i], commands[i], forces_motor=forces_motor[i]
+                )
+            )
         )
 
     batched = np.hstack(batched)
@@ -117,8 +123,10 @@ def test_numeric_arrayAPI(model: str, config: str):
     f_numeric = dynamics_numeric(model, config)
     f_jit_numeric = jax.jit(f_numeric)
 
-    npresults = f_numeric(nppos, npquat, npvel, npangvel, npforces_motor, npcommands)
-    jpresults = f_jit_numeric(jppos, jpquat, jpvel, jpangvel, jpforces_motor, jpcommands)
+    npresults = f_numeric(nppos, npquat, npvel, npangvel, npcommands, forces_motor=npforces_motor)
+    jpresults = f_jit_numeric(
+        jppos, jpquat, jpvel, jpangvel, jpcommands, forces_motor=jpforces_motor
+    )
 
     assert isinstance(npresults[0], np.ndarray), "Results are not numpy arrays"
     assert isinstance(jpresults[0], jp.ndarray), "Results are not jax arrays"
@@ -133,3 +141,6 @@ def test_numeric_arrayAPI(model: str, config: str):
 @pytest.mark.unit
 def test_external_wrench():
     assert True
+
+
+# TODO add test for None type forces_motor
