@@ -14,11 +14,14 @@ from jax.scipy.spatial.transform import Rotation as JR
 from scipy.spatial.transform import Rotation as R
 
 if TYPE_CHECKING:
-    import numpy as np
+    from jax import Array as JaxArray
     from numpy.typing import NDArray
+    from torch import Tensor
+
+    Array = NDArray | JaxArray | Tensor
 
 
-def from_quat(quat: NDArray[np.floating], scalar_first: bool = False) -> R:
+def from_quat(quat: Array, scalar_first: bool = False) -> R:
     """Creates a rotation object compatible with the type of the given quat."""
     if isinstance(quat, jp.ndarray):
         if scalar_first:
@@ -28,12 +31,20 @@ def from_quat(quat: NDArray[np.floating], scalar_first: bool = False) -> R:
         return R.from_quat(quat, scalar_first=scalar_first)
 
 
-def from_rotvec(rotvec: NDArray[np.floating], degrees: bool = False) -> R:
-    """Creates a rotation object compativle with the type of the given rotvec."""
+def from_rotvec(rotvec: Array, degrees: bool = False) -> R:
+    """Creates a rotation object compatible with the type of the given rotvec."""
     if isinstance(rotvec, jp.ndarray):
         return JR.from_rotvec(rotvec, degrees)
     else:
         return R.from_rotvec(rotvec, degrees)
+
+
+def from_euler(seq: str, angles: Array, degrees: bool = False) -> R:
+    """Creates a rotation object compativle with the type of the given angles."""
+    if isinstance(angles, jp.ndarray):
+        return JR.from_euler(seq, angles, degrees)
+    else:
+        return R.from_euler(seq, angles, degrees)
 
 
 def casadi_quat2matrix(quat: cs.MX) -> cs.MX:
