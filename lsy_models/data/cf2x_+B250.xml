@@ -71,7 +71,7 @@
                             0.0    0.0    2.98e-5" /> <!-- From Förster B.S. thesis -->
     <!-- Distance of motor from centre of mass 
          in x configuration, it's 1/sqrt(2) smaller 
-         arm "+" = 0.046 (measured); arm "x" = 0.03253 (rounded)-->
+         arm "+" = 0.046 (from CAD); arm "x" = 0.03253 (rounded)-->
     <numeric name="arm" data="0.03253" />
     <!-- Matrix on how to mix the forces into torques, different for "x" and "+" config-->
     <numeric name="mix_matrix" data="-0.5 -0.5 -1 
