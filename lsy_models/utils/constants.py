@@ -30,9 +30,9 @@ class Constants:
     PWM_MAX: np.floating
     KF: np.floating
     KM: np.floating
-    KD: np.floating
     THRUST_MIN: np.floating
     THRUST_MAX: np.floating
+    THRUST_TAU: np.floating
 
     # System Identification (SI) parameters
     SI_ROLL: NDArray[np.floating]
@@ -49,7 +49,7 @@ class Constants:
     DI_ACC: NDArray[np.floating]
 
     # Configs (used in testing)
-    available_configs: tuple[str] = ("cf2x-", "cf2x+")
+    available_configs: tuple[str] = ("cf2x_L250", "cf2x_P250", "cf2x_T350")
 
     @classmethod
     def from_file(cls, path: str) -> Constants:
@@ -77,16 +77,16 @@ class Constants:
         PWM_MAX = params["PWM_MAX"][0]
         KF = params["kf"][0]
         KM = params["km"][0]
-        KD = params["kd"][0]
         THRUST_MIN = params["THRUST_MIN"][0]
         THRUST_MAX = params["THRUST_MAX"][0]
+        THRUST_TAU = params["THRUST_TAU"][0]
 
         # System Identification (SI) parameters
         SI_ROLL = params["SI_roll"]
         SI_PITCH = params["SI_pitch"]
         SI_YAW = params["SI_yaw"]
         SI_PARAMS = np.vstack((SI_ROLL, SI_PITCH, SI_YAW))
-        SI_ACC = params["DI_acc"]  # same parameters for both models
+        SI_ACC = params["SI_acc"]
 
         # System Identification parameters for the double integrator (DI) model
         DI_ROLL = params["DI_roll"]
@@ -108,9 +108,9 @@ class Constants:
             PWM_MAX,
             KF,
             KM,
-            KD,
             THRUST_MIN,
             THRUST_MAX,
+            THRUST_TAU,
             SI_ROLL,
             SI_PITCH,
             SI_YAW,
@@ -130,9 +130,11 @@ class Constants:
         For available configs see Constants.available_configs
         """
         match config:
-            case "cf2x-":
-                return Constants.from_file("data/cf2x_-B250.xml")
-            case "cf2x+":
-                return Constants.from_file("data/cf2x_+B250.xml")
+            case "cf2x_L250":
+                return Constants.from_file("data/cf2x_L250.xml")
+            case "cf2x_P250":
+                return Constants.from_file("data/cf2x_P250.xml")
+            case "cf2x_T350":
+                return Constants.from_file("data/cf2x_T350.xml")
             case _:
                 raise ValueError(f"Drone config '{config}' is not supported")
