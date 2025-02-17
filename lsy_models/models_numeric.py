@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import lsy_models.utils.cf2 as cf2
 import lsy_models.utils.rotation as R
 
 if TYPE_CHECKING:
@@ -14,6 +15,23 @@ if TYPE_CHECKING:
     Array = NDArray | JaxArray | Tensor
 
     from lsy_models.utils.constants import Constants
+
+
+def quat_dot_from_angvel(quat: Array, angvel: Array) -> Array:
+    xp = quat.__array_namespace__()
+    x, y, z = xp.split(angvel, 3, axis=-1)
+    angvel_skew = xp.stack(
+        [
+            xp.concat((xp.zeros_like(x), -z, y), axis=-1),
+            xp.concat((z, xp.zeros_like(x), -x), axis=-1),
+            xp.concat((-y, x, xp.zeros_like(x)), axis=-1),
+        ],
+        axis=-2,
+    )  # .squeeze() # from jaxsim.math.skew
+    xi1 = xp.insert(-angvel, 0, 0, axis=-1)  # First line of xi
+    xi2 = xp.concat((xp.expand_dims(angvel.T, axis=0).T, -angvel_skew), axis=-1)
+    xi = xp.concat((xp.expand_dims(xi1, axis=-2), xi2), axis=-2)
+    return 0.5 * (xi @ quat[..., None]).squeeze(axis=-1)
 
 
 def f_first_principles(
@@ -50,7 +68,7 @@ def f_first_principles(
         # Creating force and torque vector
         forces_motor_tot = xp.sum(command, axis=-1)
     else:
-        forces_motor_dot = constants.KD * (command - forces_motor)  # TODO add dt = 1/200
+        forces_motor_dot = constants.THRUST_TAU * (command - forces_motor)  # TODO add dt = 1/200
         # Creating force and torque vector
         forces_motor_tot = xp.sum(forces_motor, axis=-1)
     # forces_motor_tot = xp.sum(
@@ -78,24 +96,13 @@ def f_first_principles(
     vel_dot = force_world_frame / constants.MASS
 
     # Rotational equation of motion
-    x, y, z = xp.split(angvel, 3, axis=-1)
-    angvel_skew = xp.stack(
-        [
-            xp.concat((xp.zeros_like(x), -z, y), axis=-1),
-            xp.concat((z, xp.zeros_like(x), -x), axis=-1),
-            xp.concat((-y, x, xp.zeros_like(x)), axis=-1),
-        ],
-        axis=-2,
-    )  # .squeeze() # from jaxsim.math.skew
-    xi1 = xp.insert(-angvel, 0, 0, axis=-1)  # First line of xi
-    xi2 = xp.concat((xp.expand_dims(angvel.T, axis=0).T, -angvel_skew), axis=-1)
-    xi = xp.concat((xp.expand_dims(xi1, axis=-2), xi2), axis=-2)
+
     if torques_dist is not None:
         # paper: rot.as_matrix() @ torques_dist
         torques = torques_motor_vec + rot.apply(torques_dist)
     else:
         torques = torques_motor_vec
-    quat_dot = 0.5 * (xi @ quat[..., None]).squeeze(axis=-1)
+    quat_dot = quat_dot_from_angvel(quat, angvel)
     angvel_dot = (
         torques - xp.cross(angvel, angvel @ constants.J)
     ) @ constants.J_inv  # batchable version
@@ -103,46 +110,72 @@ def f_first_principles(
     return pos_dot, quat_dot, vel_dot, angvel_dot, forces_motor_dot
 
 
-# def f_fitted_DI(
-#     pos: NDArray[np.floating],
-#     quat: NDArray[np.floating],
-#     vel: NDArray[np.floating],
-#     angvel: NDArray[np.floating],
-#     forces_motor: NDArray[np.floating],
-#     RPYT_cmd: NDArray[np.floating],
-#     constants: Constants,
-#     forces_dist: NDArray[np.floating] | None = None,
-#     torques_dist: NDArray[np.floating] | None = None,
-# ) -> tuple[
-#     NDArray[np.floating],
-#     NDArray[np.floating],
-#     NDArray[np.floating],
-#     NDArray[np.floating],
-#     NDArray[np.floating],
-# ]:
-#     """TODO."""
-#     xp = pos.__array_namespace__()
-#     rot = R.from_quat(quat)
-#     euler_angles = rot.as_euler("xyz")
+def f_fitted_DI_rpy(
+    pos: Array,
+    quat: Array,
+    vel: Array,
+    angvel: Array,
+    command: Array,
+    constants: Constants,
+    forces_motor: Array | None = None,
+    forces_dist: Array | None = None,
+    torques_dist: Array | None = None,
+) -> tuple[Array, Array, Array, Array, Array | None]:
+    """TODO."""
+    xp = pos.__array_namespace__()
+    rot = R.from_quat(quat)
+    euler_angles = rot.as_euler("xyz")
+    rpy_rates = rot.apply(angvel)  # is this correct?
 
-#     # Linear equation of motion
-#     coeff = constants.DI_ACC[0] * RPYT_cmd[..., 3] + constants.DI_ACC[1]
-#     cos_x3 = np.cos(x[:, 3])
-#     sin_x3 = np.sin(x[:, 3])
-#     cos_x4 = np.cos(x[:, 4])
-#     sin_x4 = np.sin(x[:, 4])
-#     cos_x5 = np.cos(x[:, 5])
-#     sin_x5 = np.sin(x[:, 5])
-#     if forces_dist is not None:
-#         force_world_frame = (
-#             forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS + forces_dist
-#         )
-#     else:
-#         force_world_frame = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
-#     pos_dot = vel
-#     vel_dot = force_world_frame / constants.MASS
+    # TODO thrust dynamics?
+    if forces_motor is not None:
+        raise NotImplementedError("Thrust dynamics can currently not be simulated")
 
-#     return pos_dot, vel_dot, quat_dot, angvel_dot, forces_motor_dot
+    # command = command * 0
+    # Linear equation of motion
+    forces_motor_tot = cf2.pwm2force(command[..., -1], constants)
+    coeff = constants.DI_ACC[0] * forces_motor_tot + constants.DI_ACC[1]
+    cos_x3 = xp.cos(euler_angles[..., 0])  # roll
+    sin_x3 = xp.sin(euler_angles[..., 0])  # roll
+    cos_x4 = xp.cos(euler_angles[..., 1])  # pitch
+    sin_x4 = xp.sin(euler_angles[..., 1])  # pitch
+    cos_x5 = xp.cos(euler_angles[..., 2])  # yaw
+    sin_x5 = xp.sin(euler_angles[..., 2])  # yaw
+    rotation_matrix = xp.stack(
+        [
+            cos_x3 * sin_x4 * cos_x5 + sin_x3 * sin_x5,
+            cos_x3 * sin_x4 * sin_x5 - sin_x3 * cos_x5,
+            cos_x3 * cos_x4,
+        ],
+        axis=-1,
+    )
+    pos_dot = vel
+    vel_dot = coeff * rotation_matrix + constants.GRAVITY_VEC
+
+    # Rotational equation of motion
+    quat_dot = quat_dot_from_angvel(quat, angvel)
+    rpy_rates_dot = (
+        constants.DI_PARAMS[:, 0] * euler_angles
+        + constants.DI_PARAMS[:, 1] * rpy_rates
+        + constants.DI_PARAMS[:, 2] * command[..., 0:3]
+    )
+    angvel_dot = rot.apply(rpy_rates_dot, inverse=True)  # is this correct?
+
+    # WARNING: This is the surrogate addition to the model and not very realistic!
+    # adding disturbances to the state
+    if forces_dist is not None:
+        vel_dot = vel_dot + forces_dist / constants.MASS
+    if torques_dist is not None:
+        # adding disturbances to the state
+        # adding torque is a little more complex:
+        # angular acceleration can be converted to torque
+        torque = angvel_dot @ constants.J - xp.cross(angvel, angvel @ constants.J.T)
+        # adding torque
+        torque = torque + torques_dist
+        # back to angular acceleration
+        angvel_dot = torque @ constants.J_inv.T
+
+    return pos_dot, quat_dot, vel_dot, angvel_dot, None
 
 
 # f = model_dynamics("cf2x+", "analytical")

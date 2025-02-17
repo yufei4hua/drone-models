@@ -49,7 +49,7 @@ def first_principles(constants: Constants) -> cs.Function:
 
     # Defining the dynamics function
     # Thrust dynamics
-    forces_motor_dot = constants.KD * (U - forces_motor)
+    forces_motor_dot = constants.THRUST_TAU * (U - forces_motor)
     # Creating force and torque vector
     forces_motor_vec = cs.vertcat(0, 0, cs.sum1(forces_motor))
     torques_motor_vec = (
