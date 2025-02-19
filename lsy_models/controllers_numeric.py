@@ -178,5 +178,4 @@ def fw_power_distribution_cap(motor_pwm: Array, constants: Constants) -> Constan
     # TODO, if 0, let it be 0
     if xp.all(motor_pwm == 0):
         return xp.zeros_like(motor_pwm)
-    else:
-        return xp.clip(motor_pwm, constants.PWM_MIN, constants.PWM_MAX)
+    return xp.clip(motor_pwm, constants.PWM_MIN, constants.PWM_MAX)

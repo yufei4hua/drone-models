@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 
 def poly(x, p, order):
+    # TODO: Rewrite using https://numpy.org/doc/2.0/reference/routines.polynomials-package.html#module-numpy.polynomial
     y = 0
     for i in range(order + 1):
         y += p[i] * x**i
@@ -24,6 +25,8 @@ def poly(x, p, order):
 
 
 def inversepoly(y, param, order):
+    # TODO: Rewrite using https://numpy.org/doc/2.0/reference/routines.polynomials-package.html#module-numpy.polynomial
+    # use p.roots()
     # index of param = order, i.e. y = sum ( p[i] * x**i ) for all i
     assert len(param) == order + 1
     if order == 1:

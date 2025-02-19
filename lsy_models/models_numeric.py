@@ -27,7 +27,7 @@ def quat_dot_from_angvel(quat: Array, angvel: Array) -> Array:
             xp.concat((-y, x, xp.zeros_like(x)), axis=-1),
         ],
         axis=-2,
-    )  # .squeeze() # from jaxsim.math.skew
+    )
     xi1 = xp.insert(-angvel, 0, 0, axis=-1)  # First line of xi
     xi2 = xp.concat((xp.expand_dims(angvel.T, axis=0).T, -angvel_skew), axis=-1)
     xi = xp.concat((xp.expand_dims(xi1, axis=-2), xi2), axis=-2)
@@ -85,22 +85,20 @@ def f_first_principles(
 
     # Linear equation of motion
     forces_motor_vec_world = rot.apply(forces_motor_vec)
+
+    force_world_frame = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
     if forces_dist is not None:
-        force_world_frame = (
-            forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS + forces_dist
-        )
-    else:
-        force_world_frame = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
+        force_world_frame = force_world_frame + forces_dist
+
     pos_dot = vel
     vel_dot = force_world_frame / constants.MASS
 
     # Rotational equation of motion
 
+    torques = torques_motor_vec
     if torques_dist is not None:
         # paper: rot.as_matrix() @ torques_dist
-        torques = torques_motor_vec + rot.apply(torques_dist)
-    else:
-        torques = torques_motor_vec
+        torques = torques + rot.apply(torques_dist)
     quat_dot = quat_dot_from_angvel(quat, angvel)
     angvel_dot = (
         torques - xp.cross(angvel, angvel @ constants.J)
