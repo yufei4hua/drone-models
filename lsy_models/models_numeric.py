@@ -65,12 +65,11 @@ def f_first_principles(
     # Thrust dynamics
     if forces_motor is None:
         forces_motor_dot = None
-        # Creating force and torque vector
-        forces_motor_tot = xp.sum(command, axis=-1)
+        forces_motor = command
     else:
         forces_motor_dot = constants.THRUST_TAU * (command - forces_motor)  # TODO add dt = 1/200
-        # Creating force and torque vector
-        forces_motor_tot = xp.sum(forces_motor, axis=-1)
+    # Creating force and torque vector
+    forces_motor_tot = xp.sum(forces_motor, axis=-1)
     # forces_motor_tot = xp.sum(
     #     command, axis=-1
     # )  # Without motor dynamics TODO make motor forces None
