@@ -13,7 +13,11 @@ from lsy_models.models import available_models, dynamic_numeric_from_symbolic, d
 from lsy_models.utils.constants import Constants
 
 if TYPE_CHECKING:
+    from jax import Array as JaxArray
     from numpy.typing import NDArray
+    from torch import Tensor
+
+    Array = NDArray | JaxArray | Tensor
 
 # For all tests to pass, we need the same precsion in jax as in np
 jax.config.update("jax_enable_x64", True)
@@ -21,7 +25,7 @@ jax.config.update("jax_enable_x64", True)
 N = 1000
 
 
-def create_rnd_states(N: int = 1000) -> tuple[NDArray, NDArray, NDArray, NDArray, NDArray]:
+def create_rnd_states(N: int = 1000) -> tuple[Array, Array, Array, Array, Array]:
     """Creates N random states."""
     pos = np.random.uniform(-5, 5, (N, 3))
     quat = np.random.uniform(
@@ -33,7 +37,7 @@ def create_rnd_states(N: int = 1000) -> tuple[NDArray, NDArray, NDArray, NDArray
     return pos, quat, vel, angvel, forces_motor
 
 
-def create_rnd_commands(N: int = 1000, dim: int = 4) -> NDArray[np.floating]:
+def create_rnd_commands(N: int = 1000, dim: int = 4) -> Array:
     """Creates N random inputs with size dim."""
     return np.random.uniform(0, 0.15, (N, dim))
 

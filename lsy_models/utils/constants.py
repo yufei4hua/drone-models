@@ -10,43 +10,47 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
+    from jax import Array as JaxArray
     from numpy.typing import NDArray
+    from torch import Tensor
+
+    Array = NDArray | JaxArray | Tensor
 
 
 @dataclass
 class Constants:
     """This is a dataclass for all necessary constants in the models."""
 
-    GRAVITY: np.floating
-    GRAVITY_VEC: NDArray[np.floating]
-    MASS: np.floating
-    J: NDArray[np.floating]
-    J_inv: NDArray[np.floating]
-    L: np.floating
-    MIX_MATRIX: NDArray[np.floating]
-    SIGN_MATRIX: NDArray[np.floating]
+    GRAVITY: float
+    GRAVITY_VEC: Array
+    MASS: float
+    J: Array
+    J_inv: Array
+    L: float
+    MIX_MATRIX: Array
+    SIGN_MATRIX: Array
 
-    PWM_MIN: np.floating
-    PWM_MAX: np.floating
-    KF: np.floating
-    KM: np.floating
-    THRUST_MIN: np.floating
-    THRUST_MAX: np.floating
-    THRUST_TAU: np.floating
+    PWM_MIN: float
+    PWM_MAX: float
+    KF: float
+    KM: float
+    THRUST_MIN: float
+    THRUST_MAX: float
+    THRUST_TAU: float
 
     # System Identification (SI) parameters
-    SI_ROLL: NDArray[np.floating]
-    SI_PITCH: NDArray[np.floating]
-    SI_YAW: NDArray[np.floating]
-    SI_PARAMS: NDArray[np.floating]
-    SI_ACC: NDArray[np.floating]
+    SI_ROLL: Array
+    SI_PITCH: Array
+    SI_YAW: Array
+    SI_PARAMS: Array
+    SI_ACC: Array
 
     # System Identification parameters for the double integrator (DI) model
-    DI_ROLL: NDArray[np.floating]
-    DI_PITCH: NDArray[np.floating]
-    DI_YAW: NDArray[np.floating]
-    DI_PARAMS: NDArray[np.floating]
-    DI_ACC: NDArray[np.floating]
+    DI_ROLL: Array
+    DI_PITCH: Array
+    DI_YAW: Array
+    DI_PARAMS: Array
+    DI_ACC: Array
 
     # Configs (used in testing)
     available_configs: tuple[str] = ("cf2x_L250", "cf2x_P250", "cf2x_T350")

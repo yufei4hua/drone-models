@@ -102,7 +102,12 @@ def dynamics_numeric(
             raise ValueError(f"Model '{model}' is not supported")
 
 
-def dynamic_numeric_from_symbolic(model: str, config: str) -> Callable[[NDArray, NDArray], NDArray]:
+def dynamic_numeric_from_symbolic(
+    model: str, config: str
+) -> Callable[
+    [Array, Array, Array, Array, Array, Array, Array | None, Array | None],
+    tuple[Array, Array, Array, Array, Array | None],
+]:
     """Creates a numerical dynamics function f(x,u) from a CasADi model.
 
     Args:
