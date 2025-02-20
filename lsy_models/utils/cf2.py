@@ -16,36 +16,6 @@ if TYPE_CHECKING:
     Array = NDArray | JaxArray | Tensor
 
 
-def poly(x, p, order):
-    # TODO: Rewrite using https://numpy.org/doc/2.0/reference/routines.polynomials-package.html#module-numpy.polynomial
-    y = 0
-    for i in range(order + 1):
-        y += p[i] * x**i
-    return y
-
-
-def inversepoly(y, param, order):
-    # TODO: Rewrite using https://numpy.org/doc/2.0/reference/routines.polynomials-package.html#module-numpy.polynomial
-    # use p.roots()
-    # index of param = order, i.e. y = sum ( p[i] * x**i ) for all i
-    assert len(param) == order + 1
-    if order == 1:
-        return (y - param[0]) / param[1]
-    elif order == 2:
-        return (-param[1] + np.sqrt(param[1] ** 2 - 4 * param[2] * (param[0] - y))) / (2 * param[2])
-    elif order == 3:
-        # https://math.vanderbilt.edu/schectex/courses/cubic/
-        # a = p[3], b = p[2], c = p[1], d = p[0]-thrust
-        p = -param[2] / (3 * param[3])
-        q = p**3 + (param[2] * param[1] - 3 * param[3] * (param[0] - y)) / (6 * param[3] ** 2)
-        r = param[1] / (3 * param[3])
-
-        qrp = np.sqrt(q**2 + (r - p**2) ** 3)
-        return np.cbrt(q + qrp) + np.cbrt(q - qrp) + p
-    else:
-        raise NotImplementedError(f"Inverted polynomial of order {order} not supported.")
-
-
 def force2pwm(thrust: Array | float, constants: Constants, perMotor: bool = False) -> Array | float:
     """Convert thrust in N to thrust in PWM.
 
@@ -78,10 +48,3 @@ def pwm2force(pwm: Array | float, constants: Constants, perMotor: bool = False) 
     if not perMotor:
         ratio *= 4
     return ratio * constants.THRUST_MAX
-
-
-# def thrust2rpm(thrust, perMotor = False, constants: Constants):
-#     """Thrust [N] = KF * RPM^2"""
-#     if not perMotor:
-#         thrust /= 4
-#     return np.sqrt(thrust/constants.KF)
