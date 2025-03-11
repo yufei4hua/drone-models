@@ -72,7 +72,7 @@ class Constants:
         GRAVITY_VEC = np.array([0, 0, -GRAVITY])
         MASS = params["mass"][0]
         J = params["J"].reshape((3, 3))
-        J_inv = np.linalg.inv(J)
+        J_INV = np.linalg.inv(J)
         L = params["arm"][0]
         MIX_MATRIX = params["mix_matrix"].reshape((4, 3))
         SIGN_MATRIX = np.sign(MIX_MATRIX)
@@ -104,7 +104,7 @@ class Constants:
             GRAVITY_VEC,
             MASS,
             J,
-            J_inv,
+            J_INV,
             L,
             MIX_MATRIX,
             SIGN_MATRIX,
