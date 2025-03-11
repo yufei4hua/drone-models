@@ -33,7 +33,15 @@ if TYPE_CHECKING:
 
 
 def cntrl_mellinger_attitude(
-    pos: Array, quat: Array, vel: Array, angvel: Array, command_RPYT: Array
+    pos: Array,
+    quat: Array,
+    vel: Array,
+    angvel: Array,
+    command_RPYT: Array,
+    i_error_m: Array | None = None,
+    angular_vel_des: Array | None = None,
+    prev_angular_vel: Array | None = None,
+    prev_angular_vel_des: Array | None = None,
 ) -> Array:
     """Simulates the attitude controller of the Mellinger controller.
 
@@ -79,46 +87,69 @@ def cntrl_mellinger_attitude(
     R_act = rot.as_matrix()
     R_des = rot_des.as_matrix()
     # print(f"R_est={R_act}, R_des={R_des}, thrust_des={thrust_des}")
-    print(f"rpy_est={rot.as_euler('xyz', degrees=True)}, rpy_des={rpy_des}")
-    eR = 0.5 * (R_des.T @ R_act - R_act.T @ R_des)
+    # print(f"rpy_est={rot.as_euler('xyz', degrees=True)}, rpy_des={rpy_des}")
+    # eR = 0.5 * (R_des.T @ R_act - R_act.T @ R_des)
+    eR = 0.5 * (
+        xp.matmul(xp.swapaxes(R_des, -1, -2), R_act) - xp.matmul(xp.swapaxes(R_act, -1, -2), R_des)
+    )
     # vee operator (SO3 to R3), the -y is to account for the frame of the crazyflie
-    eR = xp.array([eR[2, 1], -eR[0, 2], eR[1, 0]])
+    eR = xp.stack((eR[..., 2, 1], -eR[..., 0, 2], eR[..., 1, 0]), axis=-1)  # TODO stack??
+    # print(f"{eR=}")
 
     # l.256 ff
-    angular_vel_des = xp.zeros_like(pos)  # zero for now (would need to be given as input)
+    if angular_vel_des is None:
+        angular_vel_des = xp.zeros_like(pos)
     ew = angular_vel_des - angvel  # if the setpoint is ever != 0 => change sign of setpoint[1]
 
     # l. 259 ff
-    prev_angular_vel_des = xp.zeros_like(pos)  # zero for now (would need to be stored)
-    prev_angular_vel = xp.zeros_like(pos)  # zero for now (would need to be stored)
+    if prev_angular_vel_des is None:
+        prev_angular_vel_des = xp.zeros_like(pos)
+    if prev_angular_vel is None:
+        prev_angular_vel = xp.zeros_like(pos)
     err_d = (
         (angular_vel_des - prev_angular_vel_des) - (angvel - prev_angular_vel)
     ) / dt  # WARNING: if the setpoint is ever != 0 => change sign of ew.y!
     prev_angular_vel = angvel.copy()
 
     # l. 268 ff
-    i_error_m = xp.zeros_like(pos)  # zero for now (would need to be stored)
+    if i_error_m is None:
+        i_error_m = xp.zeros_like(pos)  # zero for now (would need to be stored)
     # i_error_m -= eR * dt
     # i_error_m[0:2] = xp.clip(i_error_m[0:2], -i_range_m_xy, i_range_m_xy)
     # i_error_m[2] = xp.clip(i_error_m[2], -i_range_m_z, i_range_m_z)
 
     # l. 279 ff
-    print(f"eR={eR}, ew={ew}")
-    Mx = -kR_xy * eR[0] + kw_xy * ew[0] + ki_m_xy * i_error_m[0] + kd_omega_rp * err_d[0]
-    My = -kR_xy * eR[1] + kw_xy * ew[1] + ki_m_xy * i_error_m[1] + kd_omega_rp * err_d[1]
-    Mz = -kR_z * eR[2] + kw_z * ew[2] + ki_m_z * i_error_m[2]
+    # print(f"eR={eR}, ew={ew}")
+    Mx = (
+        -kR_xy * eR[..., 0]
+        + kw_xy * ew[..., 0]
+        + ki_m_xy * i_error_m[..., 0]
+        + kd_omega_rp * err_d[..., 0]
+    )
+    My = (
+        -kR_xy * eR[..., 1]
+        + kw_xy * ew[..., 1]
+        + ki_m_xy * i_error_m[..., 1]
+        + kd_omega_rp * err_d[..., 1]
+    )
+    Mz = -kR_z * eR[..., 2] + kw_z * ew[..., 2] + ki_m_z * i_error_m[..., 2]
+
+    # print(f"{Mx=}")
 
     # l. 297 ff
-    if thrust_des > 0:
-        cmd_roll = xp.clip(Mx, -32000, 32000)
-        cmd_pitch = xp.clip(My, -32000, 32000)
-        cmd_yaw = xp.clip(-Mz, -32000, 32000)
-    else:
-        cmd_roll = 0
-        cmd_pitch = 0
-        cmd_yaw = 0
+    # if thrust_des > 0:
+    #     cmd_roll = xp.clip(Mx, -32000, 32000)
+    #     cmd_pitch = xp.clip(My, -32000, 32000)
+    #     cmd_yaw = xp.clip(-Mz, -32000, 32000)
+    # else:
+    #     cmd_roll = 0
+    #     cmd_pitch = 0
+    #     cmd_yaw = 0
+    cmd_roll = xp.where(thrust_des > 0, xp.clip(Mx, -32000, 32000), Mx * 0)
+    cmd_pitch = xp.where(thrust_des > 0, xp.clip(My, -32000, 32000), My * 0)
+    cmd_yaw = xp.where(thrust_des > 0, xp.clip(-Mz, -32000, 32000), Mz * 0)
 
-    return {"thrust": thrust_des, "roll": cmd_roll, "pitch": cmd_pitch, "yaw": cmd_yaw}
+    return {"thrust": thrust_des, "roll": cmd_roll, "pitch": cmd_pitch, "yaw": cmd_yaw}, i_error_m
 
 
 def fw_power_distribution_flapper():
@@ -142,7 +173,7 @@ def fw_power_distribution_legacy(control: dict[str, Array]) -> Array:
     m2_pwm = control["thrust"] - roll - pitch - control["yaw"]
     m3_pwm = control["thrust"] + roll - pitch + control["yaw"]
     m4_pwm = control["thrust"] + roll + pitch - control["yaw"]
-    return xp.array([m1_pwm, m2_pwm, m3_pwm, m4_pwm])
+    return xp.stack((m1_pwm, m2_pwm, m3_pwm, m4_pwm), axis=-1)
 
 
 def fw_power_distribution_force_torque(control: dict[str, Array], constants: Constants) -> Array:
@@ -168,14 +199,15 @@ def fw_power_distribution_force_torque(control: dict[str, Array], constants: Con
     m4_force = thrust_part + roll_part - pitch_part + yaw_part
 
     # TODO force 2 pwm
-    motor_forces = xp.array([m1_force, m2_force, m3_force, m4_force])
+    motor_forces = xp.stack((m1_force, m2_force, m3_force, m4_force), axis=-1)
     return cf2.force2pwm(motor_forces, constants=constants, perMotor=True)
 
 
 def fw_power_distribution_cap(motor_pwm: Array, constants: Constants) -> Constants:
     """TODO."""
     xp = motor_pwm.__array_namespace__()
-    # TODO, if 0, let it be 0
-    if xp.all(motor_pwm == 0):
-        return xp.zeros_like(motor_pwm)
-    return xp.clip(motor_pwm, constants.PWM_MIN, constants.PWM_MAX)
+    return xp.where(
+        xp.all(motor_pwm == 0),
+        xp.zeros_like(motor_pwm),
+        xp.clip(motor_pwm, constants.PWM_MIN, constants.PWM_MAX),
+    )
