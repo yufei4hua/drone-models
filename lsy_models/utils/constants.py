@@ -75,7 +75,7 @@ class Constants:
         J_INV = np.linalg.inv(J)
         L = params["arm"][0]
         MIX_MATRIX = params["mix_matrix"].reshape((4, 3))
-        SIGN_MATRIX = np.sign(MIX_MATRIX)
+        SIGN_MATRIX = params["sign_matrix"].reshape((4, 3))  # np.sign(MIX_MATRIX)
 
         PWM_MIN = params["PWM_MIN"][0]
         PWM_MAX = params["PWM_MAX"][0]
