@@ -32,7 +32,8 @@ def quat_dot_from_angvel(quat: Array, angvel: Array) -> Array:
     xi1 = xp.insert(-angvel, 0, 0, axis=-1)  # First line of xi
     xi2 = xp.concat((xp.expand_dims(angvel.T, axis=0).T, -angvel_skew), axis=-1)
     xi = xp.concat((xp.expand_dims(xi1, axis=-2), xi2), axis=-2)
-    return 0.5 * (xi @ quat[..., None]).squeeze(axis=-1)
+    return 0.5 * xp.matvec(xi, quat)
+    # return 0.5 * (xi @ quat[..., None]).squeeze(axis=-1)
 
 
 def f_first_principles(
@@ -80,7 +81,7 @@ def f_first_principles(
     # Because there currently is no way to identify the z torque in relation to the thrust,
     # we rely on a old identified value that can compute rpm to torque.
     # force = kf * rpm², torque = km * rpm² => torque = km/kf*force
-    torques_motor_vec = (forces_motor @ constants.SIGN_MATRIX) * xp.array(
+    torques_motor_vec = xp.vecmat(forces_motor, constants.SIGN_MATRIX) * xp.array(
         [constants.L, constants.L, constants.KM / constants.KF]
     )
 
@@ -101,9 +102,9 @@ def f_first_principles(
         # paper: rot.as_matrix() @ torques_dist
         torques = torques + rot.apply(torques_dist)
     quat_dot = quat_dot_from_angvel(quat, angvel)
-    angvel_dot = (
-        torques - xp.cross(angvel, angvel @ constants.J)
-    ) @ constants.J_INV  # batchable version
+    angvel_dot = xp.matvec(
+        constants.J_INV, torques - xp.cross(angvel, xp.matvec(constants.J, angvel))
+    )
 
     return pos_dot, quat_dot, vel_dot, angvel_dot, forces_motor_dot
 
@@ -167,11 +168,13 @@ def f_fitted_DI_rpy(
         # adding disturbances to the state
         # adding torque is a little more complex:
         # angular acceleration can be converted to torque
-        torque = angvel_dot @ constants.J - xp.cross(angvel, angvel @ constants.J.T)
+        torque = xp.matvec(constants.J, angvel_dot) - xp.cross(
+            angvel, xp.matvec(constants.J, angvel)
+        )
         # adding torque
         torque = torque + torques_dist
         # back to angular acceleration
-        angvel_dot = torque @ constants.J_INV.T
+        angvel_dot = xp.matvec(constants.J_INV, torque)
 
     return pos_dot, quat_dot, vel_dot, angvel_dot, None
 
