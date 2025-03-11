@@ -67,7 +67,7 @@ def first_principles(constants: Constants) -> cs.Function:
     # Rotational equation of motion
     xi = cs.vertcat(cs.horzcat(0, -angvel.T), cs.horzcat(angvel, -cs.skew(angvel)))
     quat_dot = 0.5 * (xi @ quat)
-    angvel_dot = constants.J_inv @ (
+    angvel_dot = constants.J_INV @ (
         torques_motor_vec - cs.cross(angvel, constants.J @ angvel)
     )  # TODO add disturbance torque (rotated!)
 

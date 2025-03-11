@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 
 def quat_dot_from_angvel(quat: Array, angvel: Array) -> Array:
+    """Calculates the quaternion derivative based on an angular velocity."""
     xp = quat.__array_namespace__()
     x, y, z = xp.split(angvel, 3, axis=-1)
     angvel_skew = xp.stack(
@@ -102,7 +103,7 @@ def f_first_principles(
     quat_dot = quat_dot_from_angvel(quat, angvel)
     angvel_dot = (
         torques - xp.cross(angvel, angvel @ constants.J)
-    ) @ constants.J_inv  # batchable version
+    ) @ constants.J_INV  # batchable version
 
     return pos_dot, quat_dot, vel_dot, angvel_dot, forces_motor_dot
 
@@ -170,7 +171,7 @@ def f_fitted_DI_rpy(
         # adding torque
         torque = torque + torques_dist
         # back to angular acceleration
-        angvel_dot = torque @ constants.J_inv.T
+        angvel_dot = torque @ constants.J_INV.T
 
     return pos_dot, quat_dot, vel_dot, angvel_dot, None
 

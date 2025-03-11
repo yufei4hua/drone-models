@@ -25,7 +25,7 @@ class Constants:
     GRAVITY_VEC: Array
     MASS: float
     J: Array
-    J_inv: Array
+    J_INV: Array
     L: float
     MIX_MATRIX: Array
     SIGN_MATRIX: Array
