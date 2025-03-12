@@ -50,9 +50,9 @@ def from_euler(seq: str, angles: Array, degrees: bool = False) -> R:
 def from_matrix(matrix: Array) -> R:
     """Creates a rotation objecte compatible with the type of the given rotation matrix."""
     if isinstance(matrix, jp.ndarray):
-        return JR.from_euler(matrix)
+        return JR.from_matrix(matrix)
     else:
-        return R.from_euler(matrix)
+        return R.from_matrix(matrix)
 
 
 def casadi_quat2matrix(quat: cs.MX) -> cs.MX:
