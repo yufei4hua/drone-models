@@ -135,6 +135,7 @@ def cntrl_mellinger_attitude(
     vel: Array,
     angvel: Array,
     command_RPYT: Array,
+    constants: Constants,
     dt: float = 1 / 500,
     i_error_m: Array | None = None,
     angular_vel_des: Array | None = None,
@@ -143,13 +144,14 @@ def cntrl_mellinger_attitude(
 ) -> Array:
     """Simulates the attitude controller of the Mellinger controller.
 
-    TODO: Think about if we want this to be batchable or not (what makes mor sense in terms of UKF)
-
     Args:
+        angvel: Angular velocity in rad/s
+        prev_angular_vel: Previous angular velocity in rad/s
+        prev_angular_vel_des: Previous angular velocity command in rad/s
         command_RPYT: Array of shape (4,) or (N,4), containing commanded values for roll, pitch, yaw (rpy) in degrees and thrust in PWM scaling
 
     Return:
-        Control type as in firmware TODO
+        4 Motor forces, i_error_m
     """
     xp = pos.__array_namespace__()
     thrust_des = command_RPYT[..., -1]
