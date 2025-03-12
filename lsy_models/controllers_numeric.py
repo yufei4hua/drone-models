@@ -17,8 +17,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
-
 import lsy_models.utils.cf2 as cf2
 import lsy_models.utils.rotation as R
 
@@ -30,6 +28,105 @@ if TYPE_CHECKING:
     Array = NDArray | JaxArray | Tensor
 
     from lsy_models.utils.constants import Constants
+
+
+def cntrl_mellinger_position(
+    pos: Array,
+    quat: Array,
+    vel: Array,
+    angvel: Array,
+    command_PQVW: Array,
+    constants: Constants,
+    dt: float = 1 / 500,
+    i_error: Array | None = None,
+) -> Array:
+    """The positional part of the mellinger controller.
+
+    Returns a RPYT command
+    """
+    xp = pos.__array_namespace__()
+
+    setpointPos = command_PQVW[..., 0:3]
+    setpointVel = command_PQVW[..., 3:6]
+    setpointAcc = command_PQVW[..., 6:9]
+    setpointQuat = command_PQVW[..., 9:12]
+
+    # From firmware controller_mellinger
+    mass = 0.033  # TODO (CF_MASS,)
+    massThrust = 132000
+
+    # XY Position PID
+    kp_xy = 0.4  # P
+    kd_xy = 0.2  # D
+    ki_xy = 0.05  # I
+    i_range_xy = 2.0
+
+    # Z Position
+    kp_z = 1.25  # P
+    kd_z = 0.4  # D
+    ki_z = 0.05  # I
+    i_range_z = 0.4
+
+    # Vectorization:
+    kp = xp.array([kp_xy, kp_xy, kp_z])
+    kd = xp.array([kd_xy, kd_xy, kd_z])
+    ki = xp.array([ki_xy, ki_xy, ki_z])
+    i_range = xp.array([i_range_xy, i_range_xy, i_range_z])
+
+    # l. 145 Position Error (ep)
+    r_error = setpointPos - pos
+
+    # l. 148 Velocity Error (ev)
+    v_error = setpointVel - vel
+
+    # l.151 ff Integral Error
+    if i_error is None:
+        i_error = xp.zeros_like(pos)
+    i_error = xp.clip(i_error + r_error * dt, -i_range, i_range)
+
+    # l. 161 Desired thrust [F_des] TODO correct mode?
+    target_thrust = (
+        mass * (setpointAcc + constants.GRAVITY_VEC) + kp * r_error + kd * v_error + ki * i_error
+    )
+
+    # l. 178 Rate-controlled YAW is moving YAW angle setpoint (skipped)
+    desiredYaw = 0  # TODO
+
+    # l. 189 Z-Axis [zB]
+    rot = R.from_quat(quat)
+    z_axis = rot.as_matrix()[..., :, -1]  # 3rd column or roation matrix is z axis
+
+    # l. 194 yaw correction (skipped)
+    # TODO
+
+    # l. 204 Current thrust [F]
+    current_thrust = xp.dot(target_thrust, z_axis)
+
+    # l. 207 Calculate axis [zB_des]
+    z_axis_desired = target_thrust / xp.linalg.norm(target_thrust)
+
+    # l. 210 [xC_des]
+    # x_axis_desired = z_axis_desired x [sin(yaw), cos(yaw), 0]^T
+    x_c_des_x = xp.cos(desiredYaw)
+    x_c_des_y = xp.sin(desiredYaw)
+    x_c_des_z = 0
+    x_c_des = xp.stack((x_c_des_x, x_c_des_y, x_c_des_z), axis=-1)
+    # [yB_des]
+    y_axis_desired = xp.cross(z_axis_desired, x_c_des)
+    y_axis_desired = y_axis_desired / xp.linalg.norm(y_axis_desired)
+    # [xB_des]
+    x_axis_desired = xp.cross(y_axis_desired, z_axis_desired)
+
+    # converting desired axis to rotation matrix and then to RPY
+    matrix = xp.stack((x_axis_desired, y_axis_desired, z_axis_desired), axis=-1)
+    command_RPY = R.from_matrix(matrix).as_euler("xyz", degrees=True)
+
+    # l. 283
+    thrust = massThrust * current_thrust
+
+    command_RPYT = xp.stack((command_RPY, thrust), axis=-1)
+
+    return command_RPYT
 
 
 def cntrl_mellinger_attitude(
