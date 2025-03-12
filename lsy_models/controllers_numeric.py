@@ -35,24 +35,30 @@ def cntrl_mellinger_position(
     quat: Array,
     vel: Array,
     angvel: Array,
-    command_PQVW: Array,
+    command_state: Array,
     constants: Constants,
     dt: float = 1 / 500,
     i_error: Array | None = None,
 ) -> Array:
     """The positional part of the mellinger controller.
 
-    Returns a RPYT command
+    Args:
+        command_state: Full commanded state in the form
+            [x, y, z, vx, vy, vz, ax, ay, az, yaw, roll_rate, pitch_rate, yaw_rate].
+
+    Returns a RPYT command where RPY is in degrees and T is in legacy PWM value
     """
     xp = pos.__array_namespace__()
 
-    setpointPos = command_PQVW[..., 0:3]
-    setpointVel = command_PQVW[..., 3:6]
-    setpointAcc = command_PQVW[..., 6:9]
-    setpointQuat = command_PQVW[..., 9:12]
+    setpointPos = command_state[..., 0:3]
+    setpointVel = command_state[..., 3:6]
+    setpointAcc = command_state[..., 6:9]
+    setpointYaw = command_state[..., 9]
+    setpointRPY_rates = command_state[..., 10:13]
 
     # From firmware controller_mellinger
-    mass = 0.033  # TODO (CF_MASS,)
+    # Note: The firmware assumes mass=0.027. With battery thats closer to 0.034 though!!!
+    mass = 0.034  # TODO This is the wrong mass (cf with battery weighs more!)
     massThrust = 132000
 
     # XY Position PID
@@ -86,21 +92,23 @@ def cntrl_mellinger_position(
 
     # l. 161 Desired thrust [F_des] TODO correct mode?
     target_thrust = (
-        mass * (setpointAcc + constants.GRAVITY_VEC) + kp * r_error + kd * v_error + ki * i_error
-    )
+        mass * (setpointAcc - constants.GRAVITY_VEC) + kp * r_error + kd * v_error + ki * i_error
+    )  # Note: since we've defined the gravity in z direction, a "-" needs to be added
 
     # l. 178 Rate-controlled YAW is moving YAW angle setpoint (skipped)
-    desiredYaw = 0  # TODO
+    desiredYaw = setpointYaw  # TODO
 
     # l. 189 Z-Axis [zB]
-    rot = R.from_quat(quat)
-    z_axis = rot.as_matrix()[..., :, -1]  # 3rd column or roation matrix is z axis
+    rot = R.from_quat(quat).as_matrix()
+    z_axis = rot[..., -1]  # 3rd column or roation matrix is z axis
 
     # l. 194 yaw correction (skipped)
     # TODO
 
     # l. 204 Current thrust [F]
-    current_thrust = xp.dot(target_thrust, z_axis)
+    # Taking the dot product of the last axis:
+    # current_thrust = xp.dot(target_thrust, z_axis)  # doesnt work because of dimensions
+    current_thrust = xp.einsum("...i,...i->...", target_thrust, z_axis)
 
     # l. 207 Calculate axis [zB_des]
     z_axis_desired = target_thrust / xp.linalg.norm(target_thrust)
@@ -109,7 +117,7 @@ def cntrl_mellinger_position(
     # x_axis_desired = z_axis_desired x [sin(yaw), cos(yaw), 0]^T
     x_c_des_x = xp.cos(desiredYaw)
     x_c_des_y = xp.sin(desiredYaw)
-    x_c_des_z = 0
+    x_c_des_z = x_c_des_y * 0  # to get zeros in the correct shape
     x_c_des = xp.stack((x_c_des_x, x_c_des_y, x_c_des_z), axis=-1)
     # [yB_des]
     y_axis_desired = xp.cross(z_axis_desired, x_c_des)
@@ -124,9 +132,9 @@ def cntrl_mellinger_position(
     # l. 283
     thrust = massThrust * current_thrust
 
-    command_RPYT = xp.stack((command_RPY, thrust), axis=-1)
+    command_RPYT = xp.concat((command_RPY, thrust[..., None]), axis=-1)
 
-    return command_RPYT
+    return command_RPYT, i_error
 
 
 def cntrl_mellinger_attitude(
