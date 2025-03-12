@@ -221,12 +221,19 @@ def cntrl_mellinger_attitude(
     # l. 297 ff
     M = xp.where((thrust_des > 0)[..., None], xp.clip(M, -32000, 32000), M * 0)
 
-    return {
-        "thrust": thrust_des,
-        "roll": M[..., 0],
-        "pitch": M[..., 1],
-        "yaw": -M[..., 2],
-    }, i_error_m
+    control = {"thrust": thrust_des, "roll": M[..., 0], "pitch": M[..., 1], "yaw": -M[..., 2]}
+
+    # INFO:
+    # The following part is NOT part of the Mellinger controller itself,
+    # but of the firmware. It is how the firmware calculates the motor forces
+    # onboard. Actually, the output of this part are motor PWM values.
+    # However, with the knowledge of the system, we can directly calculate the
+    # corresponding force "commands", which need to pass through the motor dynamics.
+    pwms = fw_power_distribution_legacy(control)
+    pwms = fw_power_distribution_cap(pwms, constants)
+    forces = cf2.pwm2force(pwms, constants, perMotor=True)
+
+    return forces, i_error_m
 
 
 def fw_power_distribution_flapper():
