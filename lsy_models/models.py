@@ -71,18 +71,9 @@ def dynamics_numeric(
             ) -> tuple[Array, Array, Array, Array, Array | None]:
                 command_rpyt = command.copy()
                 command_rpyt[..., :-1] = command[..., :-1] * 180 / np.pi  # rad 2 deg
-                # print(f"{command_rpyt=}")
-                # print(f"{pos=}")
-                control, _ = controllers_numeric.cntrl_mellinger_attitude(
-                    pos, quat, vel, angvel, command_rpyt
-                )  # TODO make batchable, right now command only for first element
-                # print(f"control = {control}")
-                pwms = controllers_numeric.fw_power_distribution_legacy(control)
-                # print(f"pwm uncapped = {pwms}")
-                pwms = controllers_numeric.fw_power_distribution_cap(pwms, constants)
-                # print(f"pwms capped = {pwms}")
-                forces = pwm2force(pwms, constants, perMotor=True)
-                # print(f"{forces=}")
+                forces, _ = controllers_numeric.cntrl_mellinger_attitude(
+                    pos, quat, vel, angvel, command_rpyt, constants
+                )
                 return models_numeric.f_first_principles(
                     pos,
                     quat,
