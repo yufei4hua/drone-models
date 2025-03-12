@@ -40,11 +40,19 @@ def from_rotvec(rotvec: Array, degrees: bool = False) -> R:
 
 
 def from_euler(seq: str, angles: Array, degrees: bool = False) -> R:
-    """Creates a rotation object compativle with the type of the given angles."""
+    """Creates a rotation object compatible with the type of the given angles."""
     if isinstance(angles, jp.ndarray):
         return JR.from_euler(seq, angles, degrees)
     else:
         return R.from_euler(seq, angles, degrees)
+
+
+def from_matrix(matrix: Array) -> R:
+    """Creates a rotation objecte compatible with the type of the given rotation matrix."""
+    if isinstance(matrix, jp.ndarray):
+        return JR.from_euler(matrix)
+    else:
+        return R.from_euler(matrix)
 
 
 def casadi_quat2matrix(quat: cs.MX) -> cs.MX:
