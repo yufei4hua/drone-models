@@ -27,7 +27,6 @@ class Constants:
     J: Array
     J_INV: Array
     L: float
-    MIX_MATRIX: Array
     SIGN_MATRIX: Array
 
     PWM_MIN: float
@@ -74,8 +73,7 @@ class Constants:
         J = params["J"].reshape((3, 3))
         J_INV = np.linalg.inv(J)
         L = params["arm"][0]
-        MIX_MATRIX = params["mix_matrix"].reshape((4, 3))
-        SIGN_MATRIX = params["sign_matrix"].reshape((4, 3))  # np.sign(MIX_MATRIX)
+        SIGN_MATRIX = params["sign_matrix"].reshape((4, 3))
 
         PWM_MIN = params["PWM_MIN"][0]
         PWM_MAX = params["PWM_MAX"][0]
@@ -106,7 +104,6 @@ class Constants:
             J,
             J_INV,
             L,
-            MIX_MATRIX,
             SIGN_MATRIX,
             PWM_MIN,
             PWM_MAX,
