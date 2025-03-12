@@ -38,6 +38,7 @@ def cntrl_mellinger_attitude(
     vel: Array,
     angvel: Array,
     command_RPYT: Array,
+    dt: float = 1 / 500,
     i_error_m: Array | None = None,
     angular_vel_des: Array | None = None,
     prev_angular_vel: Array | None = None,
@@ -54,12 +55,10 @@ def cntrl_mellinger_attitude(
         Control type as in firmware TODO
     """
     xp = pos.__array_namespace__()
+    thrust_des = command_RPYT[..., -1]
+    rpy_des = command_RPYT[..., :-1]
+    axis_flip = xp.array([1, -1, 1])
     # From firmware controller_mellinger
-    # WARNING: This should be set while calling. For now it is set to the same value as in the firmware
-    # Long term we should set it to 200Hz, since that's what the UKF is running at
-    dt = 1.0 / 500
-    # l. 52
-    mass_thrust = 132000
     # l. 66-79
     # Attitude
     kR_xy = 70000  # P
@@ -76,80 +75,61 @@ def cntrl_mellinger_attitude(
     # roll and pitch angular velocity
     kd_omega_rp = 200  # D
 
-    ### Calculate RPMs for first x (mean of UKF estimate) & u to keep RPM command constant
-    thrust_des = command_RPYT[..., -1]
-    rpy_des = command_RPYT[..., :-1]
+    # Vectorization
+    kR = xp.array([kR_xy, kR_xy, kR_z])
+    kw = xp.array([kw_xy, kw_xy, kw_z])
+    ki_m = xp.array([ki_m_xy, ki_m_xy, ki_m_z])
+    kd_omega = xp.array([kd_omega_rp, kd_omega_rp, 0.0])
+    i_range_m = xp.array([i_range_m_xy, i_range_m_xy, i_range_m_z])
 
-    ### From firmware controller_mellinger:
-    # l. 220 ff
+    # l. 220 ff [eR]
+    # Using the "inefficient" code from the firmware
     rot = R.from_quat(quat)
     rot_des = R.from_euler("xyz", rpy_des, degrees=True)
     R_act = rot.as_matrix()
     R_des = rot_des.as_matrix()
-    # print(f"R_est={R_act}, R_des={R_des}, thrust_des={thrust_des}")
-    # print(f"rpy_est={rot.as_euler('xyz', degrees=True)}, rpy_des={rpy_des}")
-    # eR = 0.5 * (R_des.T @ R_act - R_act.T @ R_des)
-    eR = 0.5 * (
-        xp.matmul(xp.swapaxes(R_des, -1, -2), R_act) - xp.matmul(xp.swapaxes(R_act, -1, -2), R_des)
+    eRM = xp.matmul(xp.swapaxes(R_des, -1, -2), R_act) - xp.matmul(
+        xp.swapaxes(R_act, -1, -2), R_des
     )
-    # vee operator (SO3 to R3), the -y is to account for the frame of the crazyflie
-    eR = xp.stack((eR[..., 2, 1], -eR[..., 0, 2], eR[..., 1, 0]), axis=-1)  # TODO stack??
-    # print(f"{eR=}")
+    # vee operator (SO3 to R3)
+    eR = xp.stack((eRM[..., 2, 1], eRM[..., 0, 2], eRM[..., 1, 0]), axis=-1)
+    eR = axis_flip * eR  # Sign change to account for crazyflie axis
 
-    # l.256 ff
+    # l.248 ff [ew]
     if angular_vel_des is None:
         angular_vel_des = xp.zeros_like(pos)
-    ew = angular_vel_des - angvel  # if the setpoint is ever != 0 => change sign of setpoint[1]
-
-    # l. 259 ff
     if prev_angular_vel_des is None:
         prev_angular_vel_des = xp.zeros_like(pos)
     if prev_angular_vel is None:
         prev_angular_vel = xp.zeros_like(pos)
+
+    ew = angular_vel_des - angvel  # if the setpoint is ever != 0 => change sign of setpoint[1]
+    ew = axis_flip * ew  # Sign change to account for crazyflie axis
+
     err_d = (
         (angular_vel_des - prev_angular_vel_des) - (angvel - prev_angular_vel)
     ) / dt  # WARNING: if the setpoint is ever != 0 => change sign of ew.y!
-    prev_angular_vel = angvel.copy()
+    err_d = axis_flip * err_d  # Sign change to account for crazyflie axis
 
-    # l. 268 ff
+    # l. 268 ff Integral Error
     if i_error_m is None:
-        i_error_m = xp.zeros_like(pos)  # zero for now (would need to be stored)
-    # i_error_m -= eR * dt
-    # i_error_m[0:2] = xp.clip(i_error_m[0:2], -i_range_m_xy, i_range_m_xy)
-    # i_error_m[2] = xp.clip(i_error_m[2], -i_range_m_z, i_range_m_z)
+        i_error_m = xp.zeros_like(pos)
+    i_error_m = i_error_m - eR * dt
+    i_error_m = xp.clip(i_error_m, -i_range_m, i_error_m)
 
-    # l. 279 ff
+    # l. 278 ff Moment:
     # print(f"eR={eR}, ew={ew}")
-    Mx = (
-        -kR_xy * eR[..., 0]
-        + kw_xy * ew[..., 0]
-        + ki_m_xy * i_error_m[..., 0]
-        + kd_omega_rp * err_d[..., 0]
-    )
-    My = (
-        -kR_xy * eR[..., 1]
-        + kw_xy * ew[..., 1]
-        + ki_m_xy * i_error_m[..., 1]
-        + kd_omega_rp * err_d[..., 1]
-    )
-    Mz = -kR_z * eR[..., 2] + kw_z * ew[..., 2] + ki_m_z * i_error_m[..., 2]
-
-    # print(f"{Mx=}")
+    M = -kR * eR + kw * ew + ki_m * i_error_m + kd_omega * err_d * 0
 
     # l. 297 ff
-    # if thrust_des > 0:
-    #     cmd_roll = xp.clip(Mx, -32000, 32000)
-    #     cmd_pitch = xp.clip(My, -32000, 32000)
-    #     cmd_yaw = xp.clip(-Mz, -32000, 32000)
-    # else:
-    #     cmd_roll = 0
-    #     cmd_pitch = 0
-    #     cmd_yaw = 0
-    cmd_roll = xp.where(thrust_des > 0, xp.clip(Mx, -32000, 32000), Mx * 0)
-    cmd_pitch = xp.where(thrust_des > 0, xp.clip(My, -32000, 32000), My * 0)
-    cmd_yaw = xp.where(thrust_des > 0, xp.clip(-Mz, -32000, 32000), Mz * 0)
+    M = xp.where((thrust_des > 0)[..., None], xp.clip(M, -32000, 32000), M * 0)
 
-    return {"thrust": thrust_des, "roll": cmd_roll, "pitch": cmd_pitch, "yaw": cmd_yaw}, i_error_m
+    return {
+        "thrust": thrust_des,
+        "roll": M[..., 0],
+        "pitch": M[..., 1],
+        "yaw": -M[..., 2],
+    }, i_error_m
 
 
 def fw_power_distribution_flapper():
