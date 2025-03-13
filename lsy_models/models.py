@@ -13,7 +13,6 @@ from lsy_models import (
     models_numeric,  # TODO would be nice to directly import all the functions -> currently they are called the same though
     models_symbolic,
 )
-from lsy_models.utils.cf2 import pwm2force
 from lsy_models.utils.constants import Constants
 
 if TYPE_CHECKING:

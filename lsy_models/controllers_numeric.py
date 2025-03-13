@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 import lsy_models.utils.cf2 as cf2
 import lsy_models.utils.rotation as R
+from lsy_models.utils.constants_controllers import cntrl_const_mel
 
 if TYPE_CHECKING:
     from jax import Array as JaxArray
@@ -39,14 +40,22 @@ def cntrl_mellinger_position(
     constants: Constants,
     dt: float = 1 / 500,
     i_error: Array | None = None,
-) -> Array:
+) -> tuple[Array, Array]:
     """The positional part of the mellinger controller.
 
     Args:
-        command_state: Full commanded state in the form
+        pos (Array): State of the drone (position), can be batched
+        quat (Array): State of the drone (quaternion), can be batched
+        vel (Array): State of the drone (velocity), can be batched
+        angvel (Array): State of the drone (angular velocity) in rad/s, can be batched
+        command_state (Array): Full commanded state in the form
             [x, y, z, vx, vy, vz, ax, ay, az, yaw, roll_rate, pitch_rate, yaw_rate].
+        constants (Constants): Constants of the specific drone
+        dt (float, optional): Time since last call. Defaults to 1/500.
+        i_error (Array | None, optional): Integral error. Defaults to None.
 
-    Returns a RPYT command where RPY is in degrees and T is in legacy PWM value
+    Returns:
+        tuple[Array, Array]: command_RPYT, where RPY is in degrees and T is a legacy PWM value, the second array is the i_error
     """
     xp = pos.__array_namespace__()
 
@@ -54,30 +63,9 @@ def cntrl_mellinger_position(
     setpointVel = command_state[..., 3:6]
     setpointAcc = command_state[..., 6:9]
     setpointYaw = command_state[..., 9]
-    setpointRPY_rates = command_state[..., 10:13]
+    # setpointRPY_rates = command_state[..., 10:13]
 
     # From firmware controller_mellinger
-    # Note: The firmware assumes mass=0.027. With battery thats closer to 0.034 though!!!
-    mass = 0.034  # TODO This is the wrong mass (cf with battery weighs more!)
-    massThrust = 132000
-
-    # XY Position PID
-    kp_xy = 0.4  # P
-    kd_xy = 0.2  # D
-    ki_xy = 0.05  # I
-    i_range_xy = 2.0
-
-    # Z Position
-    kp_z = 1.25  # P
-    kd_z = 0.4  # D
-    ki_z = 0.05  # I
-    i_range_z = 0.4
-
-    # Vectorization:
-    kp = xp.array([kp_xy, kp_xy, kp_z])
-    kd = xp.array([kd_xy, kd_xy, kd_z])
-    ki = xp.array([ki_xy, ki_xy, ki_z])
-    i_range = xp.array([i_range_xy, i_range_xy, i_range_z])
 
     # l. 145 Position Error (ep)
     r_error = setpointPos - pos
@@ -88,22 +76,30 @@ def cntrl_mellinger_position(
     # l.151 ff Integral Error
     if i_error is None:
         i_error = xp.zeros_like(pos)
-    i_error = xp.clip(i_error + r_error * dt, -i_range, i_range)
+    i_error = xp.clip(
+        i_error + r_error * dt, -cntrl_const_mel["i_range"], cntrl_const_mel["i_range"]
+    )
 
-    # l. 161 Desired thrust [F_des] TODO correct mode?
+    # l. 161 Desired thrust [F_des]
+    # => only one case here, since setpoint is always in absolute mode
+    # Note: since we've defined the gravity in z direction, a "-" needs to be added
     target_thrust = (
-        mass * (setpointAcc - constants.GRAVITY_VEC) + kp * r_error + kd * v_error + ki * i_error
-    )  # Note: since we've defined the gravity in z direction, a "-" needs to be added
+        cntrl_const_mel["mass"] * (setpointAcc - constants.GRAVITY_VEC)
+        + cntrl_const_mel["kp"] * r_error
+        + cntrl_const_mel["kd"] * v_error
+        + cntrl_const_mel["ki"] * i_error
+    )
 
-    # l. 178 Rate-controlled YAW is moving YAW angle setpoint (skipped)
-    desiredYaw = setpointYaw  # TODO
+    # l. 178 Rate-controlled YAW is moving YAW angle setpoint
+    # => only one case here, since the setpoint is always in absolute mode
+    desiredYaw = setpointYaw
 
     # l. 189 Z-Axis [zB]
     rot = R.from_quat(quat).as_matrix()
     z_axis = rot[..., -1]  # 3rd column or roation matrix is z axis
 
-    # l. 194 yaw correction (skipped)
-    # TODO
+    # l. 194 yaw correction (only if position control is not used)
+    # => skipped since we always use position control here
 
     # l. 204 Current thrust [F]
     # Taking the dot product of the last axis:
@@ -130,7 +126,7 @@ def cntrl_mellinger_position(
     command_RPY = R.from_matrix(matrix).as_euler("xyz", degrees=True)
 
     # l. 283
-    thrust = massThrust * current_thrust
+    thrust = cntrl_const_mel["massThrust"] * current_thrust
 
     command_RPYT = xp.concat((command_RPY, thrust[..., None]), axis=-1)
 
@@ -149,46 +145,30 @@ def cntrl_mellinger_attitude(
     angular_vel_des: Array | None = None,
     prev_angular_vel: Array | None = None,
     prev_angular_vel_des: Array | None = None,
-) -> Array:
-    """Simulates the attitude controller of the Mellinger controller.
+) -> tuple[Array, Array]:
+    """_summary.
 
     Args:
-        angvel: Angular velocity in rad/s
-        prev_angular_vel: Previous angular velocity in rad/s
-        prev_angular_vel_des: Previous angular velocity command in rad/s
-        command_RPYT: Array of shape (4,) or (N,4), containing commanded values for roll, pitch, yaw (rpy) in degrees and thrust in PWM scaling
+        pos (Array): State of the drone (position), can be batched
+        quat (Array): State of the drone (quaternion), can be batched
+        vel (Array): State of the drone (velocity), can be batched
+        angvel (Array): State of the drone (angular velocity) in rad/s, can be batched
+        command_RPYT (Array): Array of shape (4,) or (N,4), containing commanded values for roll, pitch, yaw (rpy) in degrees and thrust in PWM scaling
+        constants (Constants): Constants of the specific drone
+        dt (float, optional): Time since last call. Defaults to 1/500.
+        i_error_m (Array | None, optional): Integral error. Defaults to None.
+        angular_vel_des (Array | None, optional): Desired angular velocity in rad/s. Defaults to None.
+        prev_angular_vel (Array | None, optional): Previous angular velocity in rad/s. Defaults to None.
+        prev_angular_vel_des (Array | None, optional): Previous angular velocity command in rad/s. Defaults to None.
 
-    Return:
-        4 Motor forces, i_error_m
+    Returns:
+        tuple[Array, Array]: 4 Motor forces, i_error_m
     """
     xp = pos.__array_namespace__()
     thrust_des = command_RPYT[..., -1]
     rpy_des = command_RPYT[..., :-1]
-    axis_flip = xp.array([1, -1, 1])
+    axis_flip = xp.array([1, -1, 1])  # to change the direction of the y axis
     # From firmware controller_mellinger
-    # l. 66-79
-    # Attitude
-    kR_xy = 70000  # P
-    kw_xy = 20000  # D
-    ki_m_xy = 0.0  # I
-    i_range_m_xy = 1.0
-
-    # Yaw
-    kR_z = 60000  # P
-    kw_z = 12000  # D
-    ki_m_z = 500  # I
-    i_range_m_z = 1500
-
-    # roll and pitch angular velocity
-    kd_omega_rp = 200  # D
-
-    # Vectorization
-    kR = xp.array([kR_xy, kR_xy, kR_z])
-    kw = xp.array([kw_xy, kw_xy, kw_z])
-    ki_m = xp.array([ki_m_xy, ki_m_xy, ki_m_z])
-    kd_omega = xp.array([kd_omega_rp, kd_omega_rp, 0.0])
-    i_range_m = xp.array([i_range_m_xy, i_range_m_xy, i_range_m_z])
-
     # l. 220 ff [eR]
     # Using the "inefficient" code from the firmware
     rot = R.from_quat(quat)
@@ -222,11 +202,15 @@ def cntrl_mellinger_attitude(
     if i_error_m is None:
         i_error_m = xp.zeros_like(pos)
     i_error_m = i_error_m - eR * dt
-    i_error_m = xp.clip(i_error_m, -i_range_m, i_error_m)
+    i_error_m = xp.clip(i_error_m, -cntrl_const_mel["i_range_m"], cntrl_const_mel["i_range_m"])
 
     # l. 278 ff Moment:
-    # print(f"eR={eR}, ew={ew}")
-    M = -kR * eR + kw * ew + ki_m * i_error_m + kd_omega * err_d * 0
+    M = (
+        -cntrl_const_mel["kR"] * eR
+        + cntrl_const_mel["kw"] * ew
+        + cntrl_const_mel["ki_m"] * i_error_m
+        + cntrl_const_mel["kd_omega"] * err_d
+    )
 
     # l. 297 ff
     M = xp.where((thrust_des > 0)[..., None], xp.clip(M, -32000, 32000), M * 0)
