@@ -48,14 +48,14 @@ def cntrl_mellinger_position(
         quat (Array): State of the drone (quaternion), can be batched
         vel (Array): State of the drone (velocity), can be batched
         angvel (Array): State of the drone (angular velocity) in rad/s, can be batched
-        command_state (Array): Full commanded state in the form
+        command_state (Array): Full commanded state in SI units (or rad) in the form
             [x, y, z, vx, vy, vz, ax, ay, az, yaw, roll_rate, pitch_rate, yaw_rate].
         constants (Constants): Constants of the specific drone
         dt (float, optional): Time since last call. Defaults to 1/500.
         i_error (Array | None, optional): Integral error. Defaults to None.
 
     Returns:
-        tuple[Array, Array]: command_RPYT, where RPY is in degrees and T is a legacy PWM value, the second array is the i_error
+        tuple[Array, Array]: command_RPYT [rad, rad, rad, N], i_error
     """
     xp = pos.__array_namespace__()
 
@@ -123,10 +123,13 @@ def cntrl_mellinger_position(
 
     # converting desired axis to rotation matrix and then to RPY
     matrix = xp.stack((x_axis_desired, y_axis_desired, z_axis_desired), axis=-1)
-    command_RPY = R.from_matrix(matrix).as_euler("xyz", degrees=True)
+    command_RPY = R.from_matrix(matrix).as_euler("xyz", degrees=False)
 
     # l. 283
     thrust = cntrl_const_mel["massThrust"] * current_thrust
+
+    # Transform thrust into N to keep uniform interface
+    thrust = cf2.pwm2force(thrust, constants, perMotor=False)
 
     command_RPYT = xp.concat((command_RPY, thrust[..., None]), axis=-1)
 
@@ -153,7 +156,7 @@ def cntrl_mellinger_attitude(
         quat (Array): State of the drone (quaternion), can be batched
         vel (Array): State of the drone (velocity), can be batched
         angvel (Array): State of the drone (angular velocity) in rad/s, can be batched
-        command_RPYT (Array): Array of shape (4,) or (N,4), containing commanded values for roll, pitch, yaw (rpy) in degrees and thrust in PWM scaling
+        command_RPYT (Array): Commanded attitude (roll, pitch, yaw) and total thrust [rad, rad, rad, N]
         constants (Constants): Constants of the specific drone
         dt (float, optional): Time since last call. Defaults to 1/500.
         i_error_m (Array | None, optional): Integral error. Defaults to None.
@@ -162,17 +165,17 @@ def cntrl_mellinger_attitude(
         prev_angular_vel_des (Array | None, optional): Previous angular velocity command in rad/s. Defaults to None.
 
     Returns:
-        tuple[Array, Array]: 4 Motor forces, i_error_m
+        tuple[Array, Array]: 4 Motor forces [N], i_error_m
     """
     xp = pos.__array_namespace__()
-    thrust_des = command_RPYT[..., -1]
+    thrust_des = cf2.force2pwm(command_RPYT[..., -1], constants, perMotor=False)
     rpy_des = command_RPYT[..., :-1]
     axis_flip = xp.array([1, -1, 1])  # to change the direction of the y axis
     # From firmware controller_mellinger
     # l. 220 ff [eR]
     # Using the "inefficient" code from the firmware
     rot = R.from_quat(quat)
-    rot_des = R.from_euler("xyz", rpy_des, degrees=True)
+    rot_des = R.from_euler("xyz", rpy_des, degrees=False)
     R_act = rot.as_matrix()
     R_des = rot_des.as_matrix()
     eRM = xp.matmul(xp.swapaxes(R_des, -1, -2), R_act) - xp.matmul(
