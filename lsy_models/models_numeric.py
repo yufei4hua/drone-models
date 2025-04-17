@@ -17,11 +17,11 @@ if TYPE_CHECKING:
     from lsy_models.utils.constants import Constants
 
 
-def quat_dot_from_angvel(quat: Array, angvel: Array) -> Array:
+def quat_dot_from_ang_vel(quat: Array, ang_vel: Array) -> Array:
     """Calculates the quaternion derivative based on an angular velocity."""
     xp = quat.__array_namespace__()
-    x, y, z = xp.split(angvel, 3, axis=-1)
-    angvel_skew = xp.stack(
+    x, y, z = xp.split(ang_vel, 3, axis=-1)
+    ang_vel_skew = xp.stack(
         [
             xp.concat((xp.zeros_like(x), -z, y), axis=-1),
             xp.concat((z, xp.zeros_like(x), -x), axis=-1),
@@ -29,8 +29,8 @@ def quat_dot_from_angvel(quat: Array, angvel: Array) -> Array:
         ],
         axis=-2,
     )
-    xi1 = xp.insert(-angvel, 0, 0, axis=-1)  # First line of xi
-    xi2 = xp.concat((xp.expand_dims(angvel.T, axis=0).T, -angvel_skew), axis=-1)
+    xi1 = xp.insert(-ang_vel, 0, 0, axis=-1)  # First line of xi
+    xi2 = xp.concat((xp.expand_dims(ang_vel.T, axis=0).T, -ang_vel_skew), axis=-1)
     xi = xp.concat((xp.expand_dims(xi1, axis=-2), xi2), axis=-2)
     return 0.5 * xp.matvec(xi, quat)
     # return 0.5 * (xi @ quat[..., None]).squeeze(axis=-1)
@@ -40,7 +40,7 @@ def f_first_principles(
     pos: Array,
     quat: Array,
     vel: Array,
-    angvel: Array,
+    ang_vel: Array,
     command: Array,
     constants: Constants,
     forces_motor: Array | None = None,
@@ -54,7 +54,7 @@ def f_first_principles(
     Based on the quaternion model from https://www.dynsyslab.org/wp-content/papercite-data/pdf/mckinnon-robot20.pdf
 
     Warning:
-        Do not use quat_dot directly for integration! Only usage of angvel is mathematically correct.
+        Do not use quat_dot directly for integration! Only usage of ang_vel is mathematically correct.
         If you still decide to use quat_dot to integrate, ensure unit length!
         More information https://ahrs.readthedocs.io/en/latest/filters/angular.html
 
@@ -101,19 +101,19 @@ def f_first_principles(
     if torques_dist is not None:
         # paper: rot.as_matrix() @ torques_dist
         torques = torques + rot.apply(torques_dist)
-    quat_dot = quat_dot_from_angvel(quat, angvel)
-    angvel_dot = xp.matvec(
-        constants.J_INV, torques - xp.cross(angvel, xp.matvec(constants.J, angvel))
+    quat_dot = quat_dot_from_ang_vel(quat, ang_vel)
+    ang_vel_dot = xp.matvec(
+        constants.J_INV, torques - xp.cross(ang_vel, xp.matvec(constants.J, ang_vel))
     )
 
-    return pos_dot, quat_dot, vel_dot, angvel_dot, forces_motor_dot
+    return pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot
 
 
 def f_fitted_DI_rpy(
     pos: Array,
     quat: Array,
     vel: Array,
-    angvel: Array,
+    ang_vel: Array,
     command: Array,
     constants: Constants,
     forces_motor: Array | None = None,
@@ -124,7 +124,7 @@ def f_fitted_DI_rpy(
     xp = pos.__array_namespace__()
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
-    rpy_rates = rot.apply(angvel)  # is this correct?
+    rpy_rates = rot.apply(ang_vel)  # is this correct?
 
     # TODO thrust dynamics?
     if forces_motor is not None:
@@ -152,13 +152,13 @@ def f_fitted_DI_rpy(
     vel_dot = coeff * rotation_matrix + constants.GRAVITY_VEC
 
     # Rotational equation of motion
-    quat_dot = quat_dot_from_angvel(quat, angvel)
+    quat_dot = quat_dot_from_ang_vel(quat, ang_vel)
     rpy_rates_dot = (
         constants.DI_PARAMS[:, 0] * euler_angles
         + constants.DI_PARAMS[:, 1] * rpy_rates
         + constants.DI_PARAMS[:, 2] * command[..., 0:3]
     )
-    angvel_dot = rot.apply(rpy_rates_dot, inverse=True)  # is this correct?
+    ang_vel_dot = rot.apply(rpy_rates_dot, inverse=True)  # is this correct?
 
     # WARNING: This is the surrogate addition to the model and not very realistic!
     # adding disturbances to the state
@@ -168,15 +168,15 @@ def f_fitted_DI_rpy(
         # adding disturbances to the state
         # adding torque is a little more complex:
         # angular acceleration can be converted to torque
-        torque = xp.matvec(constants.J, angvel_dot) - xp.cross(
-            angvel, xp.matvec(constants.J, angvel)
+        torque = xp.matvec(constants.J, ang_vel_dot) - xp.cross(
+            ang_vel, xp.matvec(constants.J, ang_vel)
         )
         # adding torque
         torque = torque + torques_dist
         # back to angular acceleration
-        angvel_dot = xp.matvec(constants.J_INV, torque)
+        ang_vel_dot = xp.matvec(constants.J_INV, torque)
 
-    return pos_dot, quat_dot, vel_dot, angvel_dot, None
+    return pos_dot, quat_dot, vel_dot, ang_vel_dot, None
 
 
 # f = model_dynamics("cf2x+", "analytical")

@@ -32,13 +32,13 @@ def first_principles(constants: Constants) -> cs.Function:
     p = cs.MX.sym("p")
     q = cs.MX.sym("q")
     r = cs.MX.sym("r")
-    angvel = cs.vertcat(p, q, r)  # Quaternions
+    ang_vel = cs.vertcat(p, q, r)  # Quaternions
     f1 = cs.MX.sym("f1")
     f2 = cs.MX.sym("f2")
     f3 = cs.MX.sym("f3")
     f4 = cs.MX.sym("f4")
     forces_motor = cs.vertcat(f1, f2, f3, f4)  # Motor thrust
-    X = cs.vertcat(pos, quat, vel, angvel, forces_motor)
+    X = cs.vertcat(pos, quat, vel, ang_vel, forces_motor)
 
     # Inputs
     f1_cmd = cs.MX.sym("f1_cmd")
@@ -65,13 +65,13 @@ def first_principles(constants: Constants) -> cs.Function:
     )  # TODO add disturbance force
 
     # Rotational equation of motion
-    xi = cs.vertcat(cs.horzcat(0, -angvel.T), cs.horzcat(angvel, -cs.skew(angvel)))
+    xi = cs.vertcat(cs.horzcat(0, -ang_vel.T), cs.horzcat(ang_vel, -cs.skew(ang_vel)))
     quat_dot = 0.5 * (xi @ quat)
-    angvel_dot = constants.J_INV @ (
-        torques_motor_vec - cs.cross(angvel, constants.J @ angvel)
+    ang_vel_dot = constants.J_INV @ (
+        torques_motor_vec - cs.cross(ang_vel, constants.J @ ang_vel)
     )  # TODO add disturbance torque (rotated!)
 
-    X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, angvel_dot, forces_motor_dot)
+    X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot)
     Y = cs.vertcat(pos, quat)
 
     return X_dot, X, U, Y

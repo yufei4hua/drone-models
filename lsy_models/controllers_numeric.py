@@ -35,7 +35,7 @@ def cntrl_mellinger_position(
     pos: Array,
     quat: Array,
     vel: Array,
-    angvel: Array,
+    ang_vel: Array,
     command_state: Array,
     constants: Constants,
     dt: float = 1 / 500,
@@ -47,7 +47,7 @@ def cntrl_mellinger_position(
         pos (Array): State of the drone (position), can be batched
         quat (Array): State of the drone (quaternion), can be batched
         vel (Array): State of the drone (velocity), can be batched
-        angvel (Array): State of the drone (angular velocity) in rad/s, can be batched
+        ang_vel (Array): State of the drone (angular velocity) in rad/s, can be batched
         command_state (Array): Full commanded state in SI units (or rad) in the form
             [x, y, z, vx, vy, vz, ax, ay, az, yaw, roll_rate, pitch_rate, yaw_rate].
         constants (Constants): Constants of the specific drone
@@ -140,7 +140,7 @@ def cntrl_mellinger_attitude(
     pos: Array,
     quat: Array,
     vel: Array,
-    angvel: Array,
+    ang_vel: Array,
     command_RPYT: Array,
     constants: Constants,
     dt: float = 1 / 500,
@@ -155,7 +155,7 @@ def cntrl_mellinger_attitude(
         pos (Array): State of the drone (position), can be batched
         quat (Array): State of the drone (quaternion), can be batched
         vel (Array): State of the drone (velocity), can be batched
-        angvel (Array): State of the drone (angular velocity) in rad/s, can be batched
+        ang_vel (Array): State of the drone (angular velocity) in rad/s, can be batched
         command_RPYT (Array): Commanded attitude (roll, pitch, yaw) and total thrust [rad, rad, rad, N]
         constants (Constants): Constants of the specific drone
         dt (float, optional): Time since last call. Defaults to 1/500.
@@ -193,11 +193,11 @@ def cntrl_mellinger_attitude(
     if prev_angular_vel is None:
         prev_angular_vel = xp.zeros_like(pos)
 
-    ew = angular_vel_des - angvel  # if the setpoint is ever != 0 => change sign of setpoint[1]
+    ew = angular_vel_des - ang_vel  # if the setpoint is ever != 0 => change sign of setpoint[1]
     ew = axis_flip * ew  # Sign change to account for crazyflie axis
 
     err_d = (
-        (angular_vel_des - prev_angular_vel_des) - (angvel - prev_angular_vel)
+        (angular_vel_des - prev_angular_vel_des) - (ang_vel - prev_angular_vel)
     ) / dt  # WARNING: if the setpoint is ever != 0 => change sign of ew.y!
     err_d = axis_flip * err_d  # Sign change to account for crazyflie axis
 

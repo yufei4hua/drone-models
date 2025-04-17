@@ -32,9 +32,9 @@ def create_rnd_states(N: int = 1000) -> tuple[Array, Array, Array, Array, Array]
         -5, 5, (N, 4)
     )  # all rotation libraries should be normalizing automatically
     vel = np.random.uniform(-5, 5, (N, 3))
-    angvel = np.random.uniform(-2, 2, (N, 3))
+    ang_vel = np.random.uniform(-2, 2, (N, 3))
     forces_motor = np.random.uniform(0, 0.15, (N, 4))
-    return pos, quat, vel, angvel, forces_motor
+    return pos, quat, vel, ang_vel, forces_motor
 
 
 def create_rnd_commands(N: int = 1000, dim: int = 4) -> Array:
@@ -47,7 +47,7 @@ def create_rnd_commands(N: int = 1000, dim: int = 4) -> Array:
 @pytest.mark.parametrize("config", Constants.available_configs)
 def test_symbolic2numeric(model: str, config: str):
     """Tests if casadi numeric prediction is the same as the numpy one."""
-    pos, quat, vel, angvel, forces_motor = create_rnd_states((N))
+    pos, quat, vel, ang_vel, forces_motor = create_rnd_states((N))
     commands = create_rnd_commands(N, 4)  # TODO make dependent on model
 
     f_numeric = dynamics_numeric(model, config)
@@ -55,11 +55,11 @@ def test_symbolic2numeric(model: str, config: str):
 
     for i in range(N):  # casadi only supports non batched calls
         x_dot_numeric = f_numeric(
-            pos[i], quat[i], vel[i], angvel[i], commands[i], forces_motor=forces_motor[i]
+            pos[i], quat[i], vel[i], ang_vel[i], commands[i], forces_motor=forces_motor[i]
         )
         x_dot_numeric = np.concat(x_dot_numeric)
 
-        X = np.concat((pos[i], quat[i], vel[i], angvel[i], forces_motor[i]))
+        X = np.concat((pos[i], quat[i], vel[i], ang_vel[i], forces_motor[i]))
 
         U = commands[i]
         x_dot_symbolic2numeric = np.array(f_symbolic2numeric(X, U)).squeeze()
@@ -74,12 +74,12 @@ def test_symbolic2numeric(model: str, config: str):
 @pytest.mark.parametrize("config", Constants.available_configs)
 def test_numeric_batching(model: str, config: str):
     """Tests if batching works and if the results are identical to the non-batched version."""
-    pos, quat, vel, angvel, forces_motor = create_rnd_states((N))
+    pos, quat, vel, ang_vel, forces_motor = create_rnd_states((N))
     commands = create_rnd_commands(N, 4)  # TODO make dependent on model
 
     f_numeric = dynamics_numeric(model, config)
 
-    batched = f_numeric(pos, quat, vel, angvel, commands, forces_motor=forces_motor)
+    batched = f_numeric(pos, quat, vel, ang_vel, commands, forces_motor=forces_motor)
     batched_1 = []  # testing with batch size 1 (has led to problems earlier)
     non_batched = []
 
@@ -90,7 +90,7 @@ def test_numeric_batching(model: str, config: str):
                     pos[None, i],
                     quat[None, i],
                     vel[None, i],
-                    angvel[None, i],
+                    ang_vel[None, i],
                     commands[None, i],
                     forces_motor=forces_motor[None, i],
                 )
@@ -99,7 +99,7 @@ def test_numeric_batching(model: str, config: str):
         non_batched.append(
             np.concat(
                 f_numeric(
-                    pos[i], quat[i], vel[i], angvel[i], commands[i], forces_motor=forces_motor[i]
+                    pos[i], quat[i], vel[i], ang_vel[i], commands[i], forces_motor=forces_motor[i]
                 )
             )
         )
@@ -117,19 +117,19 @@ def test_numeric_batching(model: str, config: str):
 @pytest.mark.parametrize("config", Constants.available_configs)
 def test_numeric_arrayAPI(model: str, config: str):
     """Tests is the functions are jitable and if the results are identical to the numpy ones."""
-    nppos, npquat, npvel, npangvel, npforces_motor = create_rnd_states(N=N)
+    nppos, npquat, npvel, npang_vel, npforces_motor = create_rnd_states(N=N)
     npcommands = create_rnd_commands(N, 4)
 
     jppos, jpvel, jpquat = jp.array(nppos), jp.array(npvel), jp.array(npquat)
-    jpangvel, jpforces_motor = (jp.array(npangvel), jp.array(npforces_motor))
+    jpang_vel, jpforces_motor = (jp.array(npang_vel), jp.array(npforces_motor))
     jpcommands = jp.array(npcommands)
 
     f_numeric = dynamics_numeric(model, config)
     f_jit_numeric = jax.jit(f_numeric)
 
-    npresults = f_numeric(nppos, npquat, npvel, npangvel, npcommands, forces_motor=npforces_motor)
+    npresults = f_numeric(nppos, npquat, npvel, npang_vel, npcommands, forces_motor=npforces_motor)
     jpresults = f_jit_numeric(
-        jppos, jpquat, jpvel, jpangvel, jpcommands, forces_motor=jpforces_motor
+        jppos, jpquat, jpvel, jpang_vel, jpcommands, forces_motor=jpforces_motor
     )
 
     assert isinstance(npresults[0], np.ndarray), "Results are not numpy arrays"

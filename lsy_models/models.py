@@ -46,7 +46,7 @@ def dynamics_numeric(
         A callable which takes the states and input and returns the derivative of the state.
 
     Warning:
-        Do not use quat_dot directly for integration! Only usage of angvel is mathematically correct.
+        Do not use quat_dot directly for integration! Only usage of ang_vel is mathematically correct.
         If you still decide to use quat_dot to integrate, ensure unit length!
         More information https://ahrs.readthedocs.io/en/latest/filters/angular.html
     """
@@ -61,7 +61,7 @@ def dynamics_numeric(
                 pos: Array,
                 quat: Array,
                 vel: Array,
-                angvel: Array,
+                ang_vel: Array,
                 command: Array,
                 constants: Constants,
                 forces_motor: Array | None = None,
@@ -71,13 +71,13 @@ def dynamics_numeric(
                 command_rpyt = command.copy()
                 command_rpyt[..., :-1] = command[..., :-1] * 180 / np.pi  # rad 2 deg
                 forces, _ = controllers_numeric.cntrl_mellinger_attitude(
-                    pos, quat, vel, angvel, command_rpyt, constants
+                    pos, quat, vel, ang_vel, command_rpyt, constants
                 )
                 return models_numeric.f_first_principles(
                     pos,
                     quat,
                     vel,
-                    angvel,
+                    ang_vel,
                     forces,
                     constants,
                     forces_motor,
@@ -128,7 +128,7 @@ def observation_function(
     pos: Array,
     quat: Array,
     vel: Array,
-    angvel: Array,
+    ang_vel: Array,
     forces_motor: Array,
     command: Array,
     forces_dist: Array | None = None,
