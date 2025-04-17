@@ -16,7 +16,9 @@ if TYPE_CHECKING:
     Array = NDArray | JaxArray | Tensor
 
 
-def force2pwm(thrust: Array | float, constants: Constants, perMotor: bool = False) -> Array | float:
+def force2pwm(
+    thrust: Array | float, constants: Constants, perMotor: bool = False
+) -> Array | float:
     """Convert thrust in N to thrust in PWM.
 
     Args:
@@ -27,13 +29,15 @@ def force2pwm(thrust: Array | float, constants: Constants, perMotor: bool = Fals
     Returns:
         thrust: Array or float thrust in PWM
     """
-    if not perMotor:
-        thrust /= 4
-    ratio = thrust / constants.THRUST_MAX
+    xp = thrust.__array_namespace__()
+    motor_thrust = xp.where(perMotor, thrust, thrust / 4)
+    ratio = motor_thrust / constants.THRUST_MAX
     return ratio * constants.PWM_MAX
 
 
-def pwm2force(pwm: Array | float, constants: Constants, perMotor: bool = False) -> Array | float:
+def pwm2force(
+    pwm: Array | float, constants: Constants, perMotor: bool = False
+) -> Array | float:
     """Convert pwm thrust command to actual thrust.
 
     Args:
@@ -44,7 +48,7 @@ def pwm2force(pwm: Array | float, constants: Constants, perMotor: bool = False) 
     Returns:
         thrust: Array or float thrust in [N]
     """
+    xp = pwm.__array_namespace__()
     ratio = pwm / constants.PWM_MAX
-    if not perMotor:
-        ratio *= 4
+    ratio = xp.where(perMotor, ratio, ratio * 4)
     return ratio * constants.THRUST_MAX
