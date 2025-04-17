@@ -8,8 +8,8 @@ import numpy as np
 
 #### Mellinger controller (see controller_mellinger.c)
 # Note: The firmware assumes mass=0.027. With battery thats closer to 0.034 though!!!
-mass = 0.027  # TODO This is the wrong mass (cf with battery weighs more!)
-massThrust = 132000
+mass = 0.034  # TODO This is the wrong mass (cf with battery weighs more!)
+massThrust = 132000 * 0.034 / 0.027
 
 # XY Position PID
 kp_xy = 0.4  # P

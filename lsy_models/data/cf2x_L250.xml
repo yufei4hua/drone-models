@@ -61,13 +61,15 @@
   <custom>
     <!-- Physical Parameters-->
     <numeric name="gravity" data="9.807" /> <!-- Munich, Germany-->
+    <!-- From IROS 2022 -->
     <numeric name="mass" data="0.03454" />
-    <numeric name="J" data="1.4e-5 0.0    0.0 
+    <!-- <numeric name="J" data="1.4e-5 0.0    0.0 
                             0.0    1.4e-5 0.0
-                            0.0    0.0    2.17e-5"/> <!-- From IROS 2022 -->
-    <!-- <numeric name="J" data="1.68e-5 0.0    0.0 
+                            0.0    0.0    2.17e-5"/>  -->
+    <!-- From Förster B.S. thesis -->
+    <numeric name="J" data="1.68e-5 0.0    0.0 
                             0.0    1.68e-5 0.0
-                            0.0    0.0    2.98e-5" />  --> <!-- From Förster B.S. thesis -->
+                            0.0    0.0    2.98e-5" />  
     <!-- Distance of motor from axis 
          in x configuration, it's 1/sqrt(2) smaller 
          arm "+" = 0.046 (from CAD); arm "x" = 0.03253 (rounded)-->
