@@ -55,6 +55,59 @@ def from_matrix(matrix: Array) -> R:
         return R.from_matrix(matrix)
 
 
+def ang_vel2rpy_rates(ang_vel: Array, quat: Array) -> Array:
+    """Convert angular velocity to rpy rates with batch support."""
+    xp = quat.__array_namespace__()
+    rpy = R.from_quat(quat).as_euler("xyz")
+    phi, theta = rpy[..., 0], rpy[..., 1]
+
+    sin_phi = xp.sin(phi)
+    cos_phi = xp.cos(phi)
+    cos_theta = xp.cos(theta)
+    tan_theta = xp.tan(theta)
+    inv_cos_theta = 1 / cos_theta
+
+    one = xp.ones_like(phi)
+    zero = xp.zeros_like(phi)
+
+    conv_mat = xp.stack(
+        [
+            xp.stack([one, sin_phi * tan_theta, cos_phi * tan_theta], axis=-1),
+            xp.stack([zero, cos_phi, -sin_phi], axis=-1),
+            xp.stack([zero, sin_phi * inv_cos_theta, cos_phi * inv_cos_theta], axis=-1),
+        ],
+        axis=-2,
+    )
+
+    return xp.matmul(conv_mat, ang_vel[..., None])[..., 0]
+
+
+def rpy_rates2ang_vel(rpy_rates: Array, quat: Array) -> Array:
+    """Convert rpy rates to angular velocity with batch support."""
+    xp = quat.__array_namespace__()
+    rpy = R.from_quat(quat).as_euler("xyz")
+    phi, theta = rpy[..., 0], rpy[..., 1]
+
+    sin_phi = xp.sin(phi)
+    cos_phi = xp.cos(phi)
+    cos_theta = xp.cos(theta)
+    tan_theta = xp.tan(theta)
+
+    one = xp.ones_like(phi)
+    zero = xp.zeros_like(phi)
+
+    conv_mat = xp.stack(
+        [
+            xp.stack([one, zero, -cos_theta * tan_theta], axis=-1),
+            xp.stack([zero, cos_phi, sin_phi * cos_theta], axis=-1),
+            xp.stack([zero, -sin_phi, cos_phi * cos_theta], axis=-1),
+        ],
+        axis=-2,
+    )
+
+    return xp.matmul(conv_mat, rpy_rates[..., None])[..., 0]
+
+
 def casadi_quat2matrix(quat: cs.MX) -> cs.MX:
     """Creates a symbolic rotation matrix based on a symbolic quaternion.
 
