@@ -109,7 +109,7 @@ def f_first_principles(
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot
 
 
-def f_fitted_DI_rpy(
+def f_fitted_DI_rpyt(
     pos: Array,
     quat: Array,
     vel: Array,
@@ -120,20 +120,39 @@ def f_fitted_DI_rpy(
     forces_dist: Array | None = None,
     torques_dist: Array | None = None,
 ) -> tuple[Array, Array, Array, Array, Array | None]:
-    """TODO."""
+    """The fitted double integrator (DI) model.
+
+    Args:
+        pos (Array): Position of the drone
+        quat (Array): Quaternion of the drone (xyzw)
+        vel (Array): Velocity of the drone
+        ang_vel (Array): Angular velocity of the drone
+        command (Array): RPYT command (roll, pitch, yaw in rad, thrust in N)
+        constants (Constants): _description_
+        forces_motor (Array | None, optional): _description_. Defaults to None.
+        forces_dist (Array | None, optional): _description_. Defaults to None.
+        torques_dist (Array | None, optional): _description_. Defaults to None.
+
+    Raises:
+        NotImplementedError: _description_
+
+    Returns:
+        tuple[Array, Array, Array, Array, Array | None]: _description_
+    """
     xp = pos.__array_namespace__()
+    # 13 states
+    cmd_f = command[..., -1]
+    cmd_rpy = command[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
-    rpy_rates = rot.apply(ang_vel)  # is this correct?
+    # rpy_rates = rot.apply(ang_vel)  # WRONG
+    rpy_rates = R.ang_vel2rpy_rates(ang_vel, quat)
 
-    # TODO thrust dynamics?
     if forces_motor is not None:
-        raise NotImplementedError("Thrust dynamics can currently not be simulated")
+        print("[WARNING] This model does not work with motor dynamics and ignores them!")
 
-    # command = command * 0
-    # Linear equation of motion
-    forces_motor_tot = cf2.pwm2force(command[..., -1], constants)
-    coeff = constants.DI_ACC[0] * forces_motor_tot + constants.DI_ACC[1]
+    coeff = (constants.DI_ACC[0] + constants.DI_ACC[1] * cmd_f) / constants.MASS
+
     cos_x3 = xp.cos(euler_angles[..., 0])  # roll
     sin_x3 = xp.sin(euler_angles[..., 0])  # roll
     cos_x4 = xp.cos(euler_angles[..., 1])  # pitch
@@ -148,22 +167,21 @@ def f_fitted_DI_rpy(
         ],
         axis=-1,
     )
+
     pos_dot = vel
-    vel_dot = coeff * rotation_matrix + constants.GRAVITY_VEC
+    vel_dot = coeff[..., None] * rotation_matrix + constants.GRAVITY_VEC
+    if forces_dist is not None:
+        vel_dot = vel_dot + forces_dist / constants.MASS
 
     # Rotational equation of motion
     quat_dot = quat_dot_from_ang_vel(quat, ang_vel)
     rpy_rates_dot = (
         constants.DI_PARAMS[:, 0] * euler_angles
         + constants.DI_PARAMS[:, 1] * rpy_rates
-        + constants.DI_PARAMS[:, 2] * command[..., 0:3]
+        + constants.DI_PARAMS[:, 2] * cmd_rpy
     )
-    ang_vel_dot = rot.apply(rpy_rates_dot, inverse=True)  # is this correct?
-
-    # WARNING: This is the surrogate addition to the model and not very realistic!
-    # adding disturbances to the state
-    if forces_dist is not None:
-        vel_dot = vel_dot + forces_dist / constants.MASS
+    # ang_vel_dot = rot.apply(rpy_rates_dot, inverse=True)  # WRONG
+    ang_vel_dot = R.rpy_rates2ang_vel(rpy_rates_dot, quat)
     if torques_dist is not None:
         # adding disturbances to the state
         # adding torque is a little more complex:

@@ -57,13 +57,17 @@ def test_symbolic2numeric(model: str, config: str):
         x_dot_numeric = f_numeric(
             pos[i], quat[i], vel[i], ang_vel[i], commands[i], forces_motor=forces_motor[i]
         )
-        x_dot_numeric = np.concat(x_dot_numeric)
+        if x_dot_numeric[-1] is not None:
+            x_dot_numeric = np.concat(x_dot_numeric)
+        else:
+            x_dot_numeric = np.concat(x_dot_numeric[:-1])
 
         X = np.concat((pos[i], quat[i], vel[i], ang_vel[i], forces_motor[i]))
 
         U = commands[i]
         x_dot_symbolic2numeric = np.array(f_symbolic2numeric(X, U)).squeeze()
-        print(f"diff = {x_dot_numeric - x_dot_symbolic2numeric}")
+        print(f"i={i}, diff={x_dot_numeric - x_dot_symbolic2numeric}")
+        print(f"{x_dot_numeric=}, {x_dot_symbolic2numeric=}")
         assert np.allclose(x_dot_numeric, x_dot_symbolic2numeric), (
             "Symbolic and numeric model have different output"
         )
@@ -84,27 +88,35 @@ def test_numeric_batching(model: str, config: str):
     non_batched = []
 
     for i in range(N):
-        batched_1.append(
-            np.hstack(
-                f_numeric(
-                    pos[None, i],
-                    quat[None, i],
-                    vel[None, i],
-                    ang_vel[None, i],
-                    commands[None, i],
-                    forces_motor=forces_motor[None, i],
-                )
-            )
+        pos_bat, quat_bat, vel_bat, ang_vel_bat, forces_motor_bat = f_numeric(
+            pos[None, i],
+            quat[None, i],
+            vel[None, i],
+            ang_vel[None, i],
+            commands[None, i],
+            forces_motor=forces_motor[None, i],
         )
-        non_batched.append(
-            np.concat(
-                f_numeric(
-                    pos[i], quat[i], vel[i], ang_vel[i], commands[i], forces_motor=forces_motor[i]
-                )
-            )
-        )
+        if forces_motor_bat is not None:
+            batched_1.append(np.hstack((pos_bat, quat_bat, vel_bat, ang_vel_bat, forces_motor_bat)))
+        else:
+            batched_1.append(np.hstack((pos_bat, quat_bat, vel_bat, ang_vel_bat)))
 
-    batched = np.hstack(batched)
+        pos_non_bat, quat_non_bat, vel_non_bat, ang_vel_non_bat, forces_motor_non_bat = f_numeric(
+            pos[i], quat[i], vel[i], ang_vel[i], commands[i], forces_motor=forces_motor[i]
+        )
+        if forces_motor_non_bat is not None:
+            non_batched.append(
+                np.hstack(
+                    (pos_non_bat, quat_non_bat, vel_non_bat, ang_vel_non_bat, forces_motor_non_bat)
+                )
+            )
+        else:
+            non_batched.append(np.hstack((pos_non_bat, quat_non_bat, vel_non_bat, ang_vel_non_bat)))
+
+    if batched[-1] is not None:
+        batched = np.hstack(batched)
+    else:
+        batched = np.hstack(batched[:-1])
     batched_1 = np.vstack(batched_1)
     non_batched = np.array(non_batched)
 
@@ -134,8 +146,14 @@ def test_numeric_arrayAPI(model: str, config: str):
 
     assert isinstance(npresults[0], np.ndarray), "Results are not numpy arrays"
     assert isinstance(jpresults[0], jp.ndarray), "Results are not jax arrays"
-    npresults = np.hstack(npresults)
-    jpresults = jp.hstack(jpresults)
+    if npresults[-1] is not None:
+        npresults = np.hstack(npresults)
+    else:
+        npresults = np.hstack(npresults[:-1])
+    if jpresults[-1] is not None:
+        jpresults = np.hstack(jpresults)
+    else:
+        jpresults = np.hstack(jpresults[:-1])
     assert np.allclose(npresults, jpresults), "numpy and jax results differ"
 
 
@@ -145,6 +163,3 @@ def test_numeric_arrayAPI(model: str, config: str):
 @pytest.mark.unit
 def test_external_wrench():
     assert True
-
-
-# TODO add test for None type forces_motor

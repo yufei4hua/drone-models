@@ -6,10 +6,12 @@ https://github.com/jax-ml/jax/blob/main/jax/_src/scipy/spatial/transform.py
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 import casadi as cs
 import jax.numpy as jp
+import numpy as np
 from jax.scipy.spatial.transform import Rotation as JR
 from scipy.spatial.transform import Rotation as R
 
@@ -58,7 +60,7 @@ def from_matrix(matrix: Array) -> R:
 def ang_vel2rpy_rates(ang_vel: Array, quat: Array) -> Array:
     """Convert angular velocity to rpy rates with batch support."""
     xp = quat.__array_namespace__()
-    rpy = R.from_quat(quat).as_euler("xyz")
+    rpy = from_quat(quat).as_euler("xyz")
     phi, theta = rpy[..., 0], rpy[..., 1]
 
     sin_phi = xp.sin(phi)
@@ -85,7 +87,7 @@ def ang_vel2rpy_rates(ang_vel: Array, quat: Array) -> Array:
 def rpy_rates2ang_vel(rpy_rates: Array, quat: Array) -> Array:
     """Convert rpy rates to angular velocity with batch support."""
     xp = quat.__array_namespace__()
-    rpy = R.from_quat(quat).as_euler("xyz")
+    rpy = from_quat(quat).as_euler("xyz")
     phi, theta = rpy[..., 0], rpy[..., 1]
 
     sin_phi = xp.sin(phi)
@@ -106,6 +108,156 @@ def rpy_rates2ang_vel(rpy_rates: Array, quat: Array) -> Array:
     )
 
     return xp.matmul(conv_mat, rpy_rates[..., None])[..., 0]
+
+
+def casadi_quat2euler(quat: cs.MX, seq: str = "xyz", degrees: bool = False) -> cs.MX:
+    """TODO."""
+    if len(seq) != 3:
+        raise ValueError(f"Expected 3 axes, got {len(seq)}.")
+
+    intrinsic = re.match(r"^[XYZ]{1,3}$", seq) is not None
+    extrinsic = re.match(r"^[xyz]{1,3}$", seq) is not None
+
+    if not (intrinsic or extrinsic):
+        raise ValueError(
+            "Expected axes from `seq` to be from ['x', 'y', 'z'] or ['X', 'Y', 'Z'], got {}".format(
+                seq
+            )
+        )
+
+    if any(seq[i] == seq[i + 1] for i in range(2)):
+        raise ValueError("Expected consecutive axes to be different, got {}".format(seq))
+
+    seq = seq.lower()
+
+    # Compute euler from quat
+    if extrinsic:
+        angle_first = 0
+        angle_third = 2
+    else:
+        seq = seq[::-1]
+        angle_first = 2
+        angle_third = 0
+
+    def elementary_basis_index(axis: str) -> int:
+        """TODO."""
+        if axis == "x":
+            return 0
+        elif axis == "y":
+            return 1
+        elif axis == "z":
+            return 2
+
+    i = elementary_basis_index(seq[0])
+    j = elementary_basis_index(seq[1])
+    k = elementary_basis_index(seq[2])
+
+    symmetric = i == k
+
+    if symmetric:
+        k = 3 - i - j  # get third axis
+
+    # Check if permutation is even (+1) or odd (-1)
+    sign = (i - j) * (j - k) * (k - i) // 2
+
+    eps = 1e-7
+
+    if symmetric:
+        a = quat[3]
+        b = quat[i]
+        c = quat[j]
+        d = quat[k] * sign
+    else:
+        a = quat[3] - quat[j]
+        b = quat[i] + quat[k] * sign
+        c = quat[j] + quat[3]
+        d = quat[k] * sign - quat[i]
+
+    angles1 = 2.0 * cs.arctan2(cs.sqrt(c**2 + d**2), cs.sqrt(a**2 + b**2))
+
+    case = cs.if_else(
+        cs.fabs(angles1) <= eps, 1, cs.if_else(cs.fabs(angles1 - cs.np.pi) <= eps, 2, 0)
+    )
+
+    half_sum = cs.arctan2(b, a)
+    half_diff = cs.arctan2(d, c)
+
+    angles_case_0_ = [None, angles1, None]
+    angles_case_0_[angle_first] = half_sum - half_diff
+    angles_case_0_[angle_third] = half_sum + half_diff
+    angles_case_0 = cs.vertcat(*angles_case_0_)
+
+    angles_case_else_ = [None, angles1, 0.0]
+    angles_case_else_[0] = cs.if_else(
+        case == 1, 2.0 * half_sum, 2.0 * half_diff * (-1.0 if extrinsic else 1.0)
+    )
+    angles_case_else = cs.vertcat(*angles_case_else_)
+
+    angles = cs.if_else(case == 0, angles_case_0, angles_case_else)
+
+    if not symmetric:
+        angles[angle_third] *= sign
+        angles[1] -= cs.np.pi * 0.5
+
+    for i in range(3):
+        angles[i] += cs.if_else(
+            angles[i] < -cs.np.pi,
+            2.0 * cs.np.pi,
+            cs.if_else(angles[i] > cs.np.pi, -2.0 * cs.np.pi, 0.0),
+        )
+
+    if degrees:
+        angles = (cs.np.pi / 180.0) * cs.horzcat(angles)
+
+    return angles
+
+
+def casadi_ang_vel2rpy_rates() -> tuple[cs.MX, cs.MX, cs.MX]:
+    """TODO."""
+    qw = cs.MX.sym("qw")
+    qx = cs.MX.sym("qx")
+    qy = cs.MX.sym("qy")
+    qz = cs.MX.sym("qz")
+    quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
+    p = cs.MX.sym("p")
+    q = cs.MX.sym("q")
+    r = cs.MX.sym("r")
+    ang_vel = cs.vertcat(p, q, r)  # Angular velocity
+
+    rpy = casadi_quat2euler(quat)
+    phi, theta = rpy[0], rpy[1]
+
+    row1 = cs.horzcat(1, cs.sin(phi) * cs.tan(theta), cs.cos(phi) * cs.tan(theta))
+    row2 = cs.horzcat(0, cs.cos(phi), -cs.sin(phi))
+    row3 = cs.horzcat(0, cs.sin(phi) / cs.cos(theta), cs.cos(phi) / cs.cos(theta))
+
+    conv_mat = cs.vertcat(row1, row2, row3)
+    rpy_rates = conv_mat @ ang_vel
+    return quat, ang_vel, rpy_rates
+
+
+def casadi_rpy_rates2ang_vel() -> tuple[cs.MX, cs.MX, cs.MX]:
+    """TODO."""
+    qw = cs.MX.sym("qw")
+    qx = cs.MX.sym("qx")
+    qy = cs.MX.sym("qy")
+    qz = cs.MX.sym("qz")
+    quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
+    dphi = cs.MX.sym("dphi")
+    dtheta = cs.MX.sym("dtheta")
+    dpsi = cs.MX.sym("dpsi")
+    rpy_rates = cs.vertcat(dphi, dtheta, dpsi)  # Euler rates
+
+    rpy = casadi_quat2euler(quat)
+    phi, theta = rpy[0], rpy[1]
+
+    row1 = cs.horzcat(1, 0, -cs.cos(theta) * cs.tan(theta))
+    row2 = cs.horzcat(0, cs.cos(phi), cs.sin(phi) * cs.cos(theta))
+    row3 = cs.horzcat(0, -cs.sin(phi), cs.cos(phi) * cs.cos(theta))
+
+    conv_mat = cs.vertcat(row1, row2, row3)
+    ang_vel = conv_mat @ rpy_rates
+    return quat, rpy_rates, ang_vel
 
 
 def casadi_quat2matrix(quat: cs.MX) -> cs.MX:

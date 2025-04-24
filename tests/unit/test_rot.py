@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import casadi as cs
 import jax.numpy as jp
 import numpy as np
 import pytest
@@ -68,46 +69,6 @@ def test_rot_from_euler():
     ...  # TODO
 
 
-def simple_ang_vel2rpy_rates(ang_vel: Array, quat: Array) -> Array:
-    """Convert angular velocity to rpy rates.
-
-    Args:
-        ang_vel: The angular velocity in the body frame.
-        quat: The current orientation.
-
-    Returns:
-        The rpy rates in the body frame, following the 'xyz' convention.
-    """
-    xp = quat.__array_namespace__()
-    rpy = R.from_quat(quat).as_euler("xyz")
-    sin_phi, cos_phi = xp.sin(rpy[0]), xp.cos(rpy[0])
-    cos_theta, tan_theta = xp.cos(rpy[1]), xp.tan(rpy[1])
-    conv_mat = xp.array(
-        [
-            [1, sin_phi * tan_theta, cos_phi * tan_theta],
-            [0, cos_phi, -sin_phi],
-            [0, sin_phi / cos_theta, cos_phi / cos_theta],
-        ]
-    )
-    return conv_mat @ ang_vel
-
-
-def simple_rpy_rates2ang_vel(rpy_rates: Array, quat: Array) -> Array:
-    """Convert rpy rates to angular velocity."""
-    xp = quat.__array_namespace__()
-    rpy = R.from_quat(quat).as_euler("xyz")
-    sin_phi, cos_phi = xp.sin(rpy[0]), xp.cos(rpy[0])
-    cos_theta, tan_theta = xp.cos(rpy[1]), xp.tan(rpy[1])
-    conv_mat = xp.array(
-        [
-            [1, 0, -cos_theta * tan_theta],
-            [0, cos_phi, sin_phi * cos_theta],
-            [0, -sin_phi, cos_phi * cos_theta],
-        ]
-    )
-    return conv_mat @ rpy_rates
-
-
 @pytest.mark.unit
 def test_ang_vel2rpy_rates_two_way():
     """TODO."""
@@ -125,8 +86,13 @@ def test_ang_vel2rpy_rates_batching():
     quats = np.array(create_uniform_quats())
     ang_vels = np.array(create_uniform_ang_vel())
 
+    # Calculate batched version
     rpy_rates = R.ang_vel2rpy_rates(ang_vels, quats)
 
+    # Compare to casadi implementation
+    cs_quat, cs_ang_vel, cs_rpy_rates = R.casadi_ang_vel2rpy_rates()
+    ang_vel2rpy_rates = cs.Function("ang_vel2rpy_rates", [cs_quat, cs_ang_vel], [cs_rpy_rates])
     for i in range(len(ang_vels)):
-        rpy_rates_simple = simple_ang_vel2rpy_rates(ang_vels[i], quats[i])
-        assert np.allclose(rpy_rates_simple, rpy_rates[i]), "Batched ang_vel2rpy_rates is wrong."
+        # TODO test against casadi implementation
+        rpy_rates_cs = np.array(ang_vel2rpy_rates(quats[i], ang_vels[i])).flatten()
+        assert np.allclose(rpy_rates_cs, rpy_rates[i]), "Batched ang_vel2rpy_rates is wrong."

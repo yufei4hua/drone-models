@@ -10,7 +10,7 @@ import lsy_models.utils.rotation as R
 from lsy_models.utils.constants import Constants
 
 
-def first_principles(constants: Constants) -> cs.Function:
+def first_principles(constants: Constants) -> tuple[cs.MX, cs.MX, cs.MX, cs.MX]:
     """TODO take from numeric."""
     # nx, nu = 13, 4
 
@@ -27,12 +27,12 @@ def first_principles(constants: Constants) -> cs.Function:
     qx = cs.MX.sym("qx")
     qy = cs.MX.sym("qy")
     qz = cs.MX.sym("qz")
-    quat = cs.vertcat(qw, qx, qy, qz)  # Quaternions
+    quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
     rot = R.casadi_quat2matrix(quat)  # Rotation matrix from body to world frame
     p = cs.MX.sym("p")
     q = cs.MX.sym("q")
     r = cs.MX.sym("r")
-    ang_vel = cs.vertcat(p, q, r)  # Quaternions
+    ang_vel = cs.vertcat(p, q, r)  # Angular velocity
     f1 = cs.MX.sym("f1")
     f2 = cs.MX.sym("f2")
     f3 = cs.MX.sym("f3")
@@ -72,6 +72,76 @@ def first_principles(constants: Constants) -> cs.Function:
     )  # TODO add disturbance torque (rotated!)
 
     X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot)
+    Y = cs.vertcat(pos, quat)
+
+    return X_dot, X, U, Y
+
+
+def f_fitted_DI_rpyt(constants: Constants) -> tuple[cs.MX, cs.MX, cs.MX, cs.MX]:
+    """TODO take from numeric."""
+    # nx, nu = 13, 4
+
+    # States
+    px = cs.MX.sym("px")
+    py = cs.MX.sym("py")
+    pz = cs.MX.sym("pz")
+    pos = cs.vertcat(px, py, pz)  # Position
+    vx = cs.MX.sym("vx")
+    vy = cs.MX.sym("vy")
+    vz = cs.MX.sym("vz")
+    vel = cs.vertcat(vx, vy, vz)  # Velocity
+    qw = cs.MX.sym("qw")
+    qx = cs.MX.sym("qx")
+    qy = cs.MX.sym("qy")
+    qz = cs.MX.sym("qz")
+    quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
+    rot = R.casadi_quat2matrix(quat)  # Rotation matrix from body to world frame
+    p = cs.MX.sym("p")
+    q = cs.MX.sym("q")
+    r = cs.MX.sym("r")
+    ang_vel = cs.vertcat(p, q, r)  # Angular velocity
+    f1 = cs.MX.sym("f1")
+    f2 = cs.MX.sym("f2")
+    f3 = cs.MX.sym("f3")
+    f4 = cs.MX.sym("f4")
+    forces_motor = cs.vertcat(f1, f2, f3, f4)  # Motor thrust
+    X = cs.vertcat(pos, quat, vel, ang_vel, forces_motor)
+
+    # Inputs
+    roll_cmd = cs.MX.sym("roll_cmd")
+    pitch_cmd = cs.MX.sym("pitch_cmd")
+    yaw_cmd = cs.MX.sym("yaw_cmd")
+    thrust_cmd = cs.MX.sym("thrust_cmd")
+    U = cs.vertcat(roll_cmd, pitch_cmd, yaw_cmd, thrust_cmd)  # U
+
+    # Defining the dynamics function
+    # Creating force and torque vector
+    forces_motor_vec = cs.vertcat(0, 0, constants.DI_ACC[0] + constants.DI_ACC[1] * thrust_cmd)
+
+    # Linear equation of motion
+    pos_dot = vel
+    vel_dot = rot @ forces_motor_vec / constants.MASS + constants.GRAVITY_VEC
+    # TODO add disturbance force
+
+    # Rotational equation of motion
+    euler_angles = R.casadi_quat2euler(quat)
+    cs_quat, cs_ang_vel, cs_rpy_rates = R.casadi_ang_vel2rpy_rates()
+    ang_vel2rpy_rates = cs.Function("ang_vel2rpy_rates", [cs_quat, cs_ang_vel], [cs_rpy_rates])
+    cs_quat, cs_rpy_rates, cs_ang_vel = R.casadi_rpy_rates2ang_vel()
+    rpy_rates2ang_vel = cs.Function("rpy_rates2ang_vel", [cs_quat, cs_rpy_rates], [cs_ang_vel])
+
+    xi = cs.vertcat(cs.horzcat(0, -ang_vel.T), cs.horzcat(ang_vel, -cs.skew(ang_vel)))
+    quat_dot = 0.5 * (xi @ quat)
+    rpy_rates = ang_vel2rpy_rates(quat, ang_vel)
+    rpy_rates_dot = (
+        constants.DI_PARAMS[:, 0] * euler_angles
+        + constants.DI_PARAMS[:, 1] * rpy_rates
+        + constants.DI_PARAMS[:, 2] * cs.vertcat(roll_cmd, pitch_cmd, yaw_cmd)
+    )
+    ang_vel_dot = rpy_rates2ang_vel(quat, rpy_rates_dot)
+    # TODO add disturbance torque (rotated!)
+
+    X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot)
     Y = cs.vertcat(pos, quat)
 
     return X_dot, X, U, Y

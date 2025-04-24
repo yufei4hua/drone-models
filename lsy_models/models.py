@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     Array = NDArray | JaxArray | Tensor
 
 # used in testing
-available_models = ["first_principles"]  # "mellinger_rpyt", "f_fitted_DI_rpy",
+available_models = ["first_principles", "fitted_DI_rpyt"]  # "mellinger_rpyt",
 # available_models = ({"name": "first_principles", "continuous": True},
 #                     ...) # TODO
 
@@ -89,8 +89,10 @@ def dynamics_numeric(
 
         case "fitted_SI":
             raise ValueError(f"Model '{model}' is not supported")  # TODO
-        case "fitted_DI_rpy":
-            return partial(models_numeric.f_fitted_DI_rpy, constants=constants)
+        case "fitted_DI_rpyt":
+            return partial(models_numeric.f_fitted_DI_rpyt, constants=constants)
+        case "fitted_DI_D_rpyt":
+            return partial(models_numeric.f_fitted_DI_D_rpyt, constants=constants)
         case _:
             raise ValueError(f"Model '{model}' is not supported")
 
@@ -116,10 +118,11 @@ def dynamic_numeric_from_symbolic(
         case "first_principles":
             X_dot, X, U, _ = models_symbolic.first_principles(constants)
             return cs.Function("first_principles", [X, U], [X_dot])
-        case "fitted_SI":
+        case "fitted_SI_rpyt":
             raise ValueError(f"Model '{model}' is not supported")  # TODO
-        case "fitted_DI":
-            raise ValueError(f"Model '{model}' is not supported")  # TODO
+        case "fitted_DI_rpyt":
+            X_dot, X, U, _ = models_symbolic.f_fitted_DI_rpyt(constants)
+            return cs.Function("first_principles", [X, U], [X_dot])
         case _:
             raise ValueError(f"Model '{model}' is not supported")
 
