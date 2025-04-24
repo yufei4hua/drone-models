@@ -51,6 +51,13 @@ class Constants:
     DI_PARAMS: Array
     DI_ACC: Array
 
+    # System Identification parameters for the double integrator (DI) model with delay
+    DI_d_ROLL: Array
+    DI_d_PITCH: Array
+    DI_d_YAW: Array
+    DI_d_PARAMS: Array
+    DI_d_ACC: Array
+
     # Configs (used in testing)
     available_configs: tuple[str] = ("cf2x_L250", "cf2x_P250", "cf2x_T350")
 
@@ -97,6 +104,12 @@ class Constants:
         DI_PARAMS = np.vstack((DI_ROLL, DI_PITCH, DI_YAW))
         DI_ACC = params["DI_acc"]
 
+        DI_D_ROLL = params["DI_D_roll"]
+        DI_D_PITCH = params["DI_D_pitch"]
+        DI_D_YAW = params["DI_D_yaw"]
+        DI_D_PARAMS = np.vstack((DI_D_ROLL, DI_D_PITCH, DI_D_YAW))
+        DI_D_ACC = params["DI_D_acc"]
+
         return cls(
             GRAVITY,
             GRAVITY_VEC,
@@ -122,6 +135,11 @@ class Constants:
             DI_YAW,
             DI_PARAMS,
             DI_ACC,
+            DI_D_ROLL,
+            DI_D_PITCH,
+            DI_D_YAW,
+            DI_D_PARAMS,
+            DI_D_ACC,
         )
 
     @classmethod

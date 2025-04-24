@@ -95,16 +95,22 @@
     <numeric name="km" data="7.94e-12" /> <!-- From old identification! TODO: Replace if possible-->
 
     <!-- System Idenfication: Simple Model-->
-    <numeric name="SI_roll" data="-3.96 4.08" />
-    <numeric name="SI_pitch" data="-6.00 6.21" />
-    <numeric name="SI_yaw" data="0.0 0.0" /> <!-- Not Identified!-->
-    <numeric name="SI_acc" data="20.907574256269616 3.653687545690674" />
+    <numeric name="SI_roll" data="-12.7 10.15" />
+    <numeric name="SI_pitch" data="-12.7 10.15" />
+    <numeric name="SI_yaw" data="-8.117 14.36" /> 
+    <numeric name="SI_acc" data="0.1906 0.4903" /> <!--Index is order-->
 
     <!-- System Identification: Double Integrator Model-->
-    <numeric name="DI_roll" data="-99.94 -13.3 84.73" />
-    <numeric name="DI_pitch" data="-130.3 -16.33 119.3" />
-    <numeric name="DI_yaw" data="0.0 0.0 0.0" />  <!-- Not Identified!-->
-    <numeric name="DI_acc" data="20.907574256269616 3.653687545690674" />
+    <numeric name="DI_roll" data="-286.2 -23.03 225.6" />
+    <numeric name="DI_pitch" data="-286.2 -23.03 225.6" />
+    <numeric name="DI_yaw" data="-192.9 -22.22 323.5" /> 
+    <numeric name="DI_acc" data="0.1906 0.4903" /> <!--Index is order-->
+
+    <!-- System Identification: Double Integrator Model with delay-->
+    <numeric name="DI_D_roll" data="-286.2 -23.03 225.6" />
+    <numeric name="DI_D_pitch" data="-286.2 -23.03 225.6" />
+    <numeric name="DI_D_yaw" data="-192.9 -22.22 323.5" /> 
+    <numeric name="DI_D_acc" data="0.1670 0.5615 0.0654" /> <!--Index is order, tau is last-->
 
   </custom>
 
