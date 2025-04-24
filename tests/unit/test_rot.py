@@ -75,8 +75,8 @@ def test_ang_vel2rpy_rates_two_way():
     quats = np.array(create_uniform_quats())
     ang_vels = np.array(create_uniform_ang_vel())
 
-    rpy_rates_two_way = R.ang_vel2rpy_rates(ang_vels, quats)
-    ang_vels_two_way = R.rpy_rates2ang_vel(rpy_rates_two_way, quats)
+    rpy_rates_two_way = R.ang_vel2rpy_rates(quats, ang_vels)
+    ang_vels_two_way = R.rpy_rates2ang_vel(quats, rpy_rates_two_way)
     assert np.allclose(ang_vels, ang_vels_two_way), "Two way transform results are off."
 
 
@@ -87,7 +87,7 @@ def test_ang_vel2rpy_rates_batching():
     ang_vels = np.array(create_uniform_ang_vel())
 
     # Calculate batched version
-    rpy_rates = R.ang_vel2rpy_rates(ang_vels, quats)
+    rpy_rates = R.ang_vel2rpy_rates(quats, ang_vels)
 
     # Compare to casadi implementation
     cs_quat, cs_ang_vel, cs_rpy_rates = R.casadi_ang_vel2rpy_rates()

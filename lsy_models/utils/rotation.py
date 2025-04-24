@@ -57,7 +57,7 @@ def from_matrix(matrix: Array) -> R:
         return R.from_matrix(matrix)
 
 
-def ang_vel2rpy_rates(ang_vel: Array, quat: Array) -> Array:
+def ang_vel2rpy_rates(quat: Array, ang_vel: Array) -> Array:
     """Convert angular velocity to rpy rates with batch support."""
     xp = quat.__array_namespace__()
     rpy = from_quat(quat).as_euler("xyz")
@@ -84,7 +84,7 @@ def ang_vel2rpy_rates(ang_vel: Array, quat: Array) -> Array:
     return xp.matmul(conv_mat, ang_vel[..., None])[..., 0]
 
 
-def rpy_rates2ang_vel(rpy_rates: Array, quat: Array) -> Array:
+def rpy_rates2ang_vel(quat: Array, rpy_rates: Array) -> Array:
     """Convert rpy rates to angular velocity with batch support."""
     xp = quat.__array_namespace__()
     rpy = from_quat(quat).as_euler("xyz")
@@ -126,7 +126,9 @@ def casadi_quat2euler(quat: cs.MX, seq: str = "xyz", degrees: bool = False) -> c
         )
 
     if any(seq[i] == seq[i + 1] for i in range(2)):
-        raise ValueError("Expected consecutive axes to be different, got {}".format(seq))
+        raise ValueError(
+            "Expected consecutive axes to be different, got {}".format(seq)
+        )
 
     seq = seq.lower()
 

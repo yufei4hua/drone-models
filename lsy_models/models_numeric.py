@@ -146,7 +146,7 @@ def f_fitted_DI_rpyt(
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
     # rpy_rates = rot.apply(ang_vel)  # WRONG
-    rpy_rates = R.ang_vel2rpy_rates(ang_vel, quat)
+    rpy_rates = R.ang_vel2rpy_rates(quat, ang_vel)
 
     if forces_motor is not None:
         print("[WARNING] This model does not work with motor dynamics and ignores them!")
@@ -181,7 +181,7 @@ def f_fitted_DI_rpyt(
         + constants.DI_PARAMS[:, 2] * cmd_rpy
     )
     # ang_vel_dot = rot.apply(rpy_rates_dot, inverse=True)  # WRONG
-    ang_vel_dot = R.rpy_rates2ang_vel(rpy_rates_dot, quat)
+    ang_vel_dot = R.rpy_rates2ang_vel(quat, rpy_rates_dot)
     if torques_dist is not None:
         # adding disturbances to the state
         # adding torque is a little more complex:
