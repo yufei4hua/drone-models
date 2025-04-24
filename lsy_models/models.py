@@ -129,8 +129,8 @@ def observation_function(
     quat: Array,
     vel: Array,
     ang_vel: Array,
-    forces_motor: Array,
     command: Array,
+    forces_motor: Array | None = None,
     forces_dist: Array | None = None,
     torques_dist: Array | None = None,
 ) -> Array:
