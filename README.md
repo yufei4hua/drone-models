@@ -11,11 +11,11 @@ Drone models @ LSY. Contains symbolic (CasADi) and numeric (NumPy, JAX, ArrayAPI
 [Python Version]: https://img.shields.io/badge/python-3.10+-blue.svg
 [Python Version URL]: https://www.python.org
 
-[Ruff Check]: https://github.com/utiasDSL/models/actions/workflows/ruff.yaml/badge.svg?style=flat-square
-[Ruff Check URL]: https://github.com/utiasDSL/models/actions/workflows/ruff.yaml
+[Ruff Check]: https://github.com/utiasDSL/models/actions/workflows/ruff.yml/badge.svg?style=flat-square
+[Ruff Check URL]: https://github.com/utiasDSL/models/actions/workflows/ruff.yml
 
-[Tests]: https://github.com/utiasDSL/models/actions/workflows/testing.yaml/badge.svg
-[Tests URL]: https://github.com/utiasDSL/models/actions/workflows/testing.yaml
+[Tests]: https://github.com/utiasDSL/models/actions/workflows/testing.yml/badge.svg
+[Tests URL]: https://github.com/utiasDSL/models/actions/workflows/testing.yml
 
 ## Installation
 
