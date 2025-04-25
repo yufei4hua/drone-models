@@ -48,6 +48,8 @@ def create_rnd_commands(N: int = 1000, dim: int = 4) -> Array:
 def test_symbolic2numeric(model: str, config: str):
     """Tests if casadi numeric prediction is the same as the numpy one."""
     pos, quat, vel, ang_vel, forces_motor = create_rnd_states((N))
+    if model == "fitted_DI_rpyt":
+        forces_motor = [None] * N
     commands = create_rnd_commands(N, 4)  # TODO make dependent on model
 
     f_numeric = dynamics_numeric(model, config)
@@ -62,7 +64,10 @@ def test_symbolic2numeric(model: str, config: str):
         else:
             x_dot_numeric = np.concat(x_dot_numeric[:-1])
 
-        X = np.concat((pos[i], quat[i], vel[i], ang_vel[i], forces_motor[i]))
+        if forces_motor[i] is not None:
+            X = np.concat((pos[i], quat[i], vel[i], ang_vel[i], forces_motor[i]))
+        else:
+            X = np.concat((pos[i], quat[i], vel[i], ang_vel[i]))
 
         U = commands[i]
         x_dot_symbolic2numeric = np.array(f_symbolic2numeric(X, U)).squeeze()
@@ -78,39 +83,48 @@ def test_symbolic2numeric(model: str, config: str):
 @pytest.mark.parametrize("config", Constants.available_configs)
 def test_numeric_batching(model: str, config: str):
     """Tests if batching works and if the results are identical to the non-batched version."""
-    pos, quat, vel, ang_vel, forces_motor = create_rnd_states((N))
+    pos, quat, vel, ang_vel, forces_motor = create_rnd_states(N)
     commands = create_rnd_commands(N, 4)  # TODO make dependent on model
 
     f_numeric = dynamics_numeric(model, config)
+    if model == "fitted_DI_rpyt":
+        forces_motor = None
 
     batched = f_numeric(pos, quat, vel, ang_vel, commands, forces_motor=forces_motor)
     batched_1 = []  # testing with batch size 1 (has led to problems earlier)
     non_batched = []
 
     for i in range(N):
-        pos_bat, quat_bat, vel_bat, ang_vel_bat, forces_motor_bat = f_numeric(
-            pos[None, i],
-            quat[None, i],
-            vel[None, i],
-            ang_vel[None, i],
-            commands[None, i],
-            forces_motor=forces_motor[None, i],
-        )
-        if forces_motor_bat is not None:
+        if forces_motor is not None:
+            pos_bat, quat_bat, vel_bat, ang_vel_bat, forces_motor_bat = f_numeric(
+                pos[None, i],
+                quat[None, i],
+                vel[None, i],
+                ang_vel[None, i],
+                commands[None, i],
+                forces_motor=forces_motor[None, i],
+            )
             batched_1.append(np.hstack((pos_bat, quat_bat, vel_bat, ang_vel_bat, forces_motor_bat)))
-        else:
-            batched_1.append(np.hstack((pos_bat, quat_bat, vel_bat, ang_vel_bat)))
 
-        pos_non_bat, quat_non_bat, vel_non_bat, ang_vel_non_bat, forces_motor_non_bat = f_numeric(
-            pos[i], quat[i], vel[i], ang_vel[i], commands[i], forces_motor=forces_motor[i]
-        )
-        if forces_motor_non_bat is not None:
+            pos_non_bat, quat_non_bat, vel_non_bat, ang_vel_non_bat, forces_motor_non_bat = (
+                f_numeric(
+                    pos[i], quat[i], vel[i], ang_vel[i], commands[i], forces_motor=forces_motor[i]
+                )
+            )
             non_batched.append(
                 np.hstack(
                     (pos_non_bat, quat_non_bat, vel_non_bat, ang_vel_non_bat, forces_motor_non_bat)
                 )
             )
         else:
+            pos_bat, quat_bat, vel_bat, ang_vel_bat, forces_motor_bat = f_numeric(
+                pos[None, i], quat[None, i], vel[None, i], ang_vel[None, i], commands[None, i]
+            )
+            batched_1.append(np.hstack((pos_bat, quat_bat, vel_bat, ang_vel_bat)))
+
+            pos_non_bat, quat_non_bat, vel_non_bat, ang_vel_non_bat, forces_motor_non_bat = (
+                f_numeric(pos[i], quat[i], vel[i], ang_vel[i], commands[i])
+            )
             non_batched.append(np.hstack((pos_non_bat, quat_non_bat, vel_non_bat, ang_vel_non_bat)))
 
     if batched[-1] is not None:
@@ -130,10 +144,16 @@ def test_numeric_batching(model: str, config: str):
 def test_numeric_arrayAPI(model: str, config: str):
     """Tests is the functions are jitable and if the results are identical to the numpy ones."""
     nppos, npquat, npvel, npang_vel, npforces_motor = create_rnd_states(N=N)
+    if model == "fitted_DI_rpyt":
+        npforces_motor = None
     npcommands = create_rnd_commands(N, 4)
 
-    jppos, jpvel, jpquat = jp.array(nppos), jp.array(npvel), jp.array(npquat)
-    jpang_vel, jpforces_motor = (jp.array(npang_vel), jp.array(npforces_motor))
+    jppos, jpquat = jp.array(nppos), jp.array(npquat)
+    jpvel, jpang_vel = jp.array(npvel), jp.array(npang_vel)
+    if model == "fitted_DI_rpyt":
+        jpforces_motor = None
+    else:
+        jpforces_motor = jp.array(npforces_motor)
     jpcommands = jp.array(npcommands)
 
     f_numeric = dynamics_numeric(model, config)

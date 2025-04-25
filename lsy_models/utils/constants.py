@@ -52,11 +52,11 @@ class Constants:
     DI_ACC: Array
 
     # System Identification parameters for the double integrator (DI) model with delay
-    DI_d_ROLL: Array
-    DI_d_PITCH: Array
-    DI_d_YAW: Array
-    DI_d_PARAMS: Array
-    DI_d_ACC: Array
+    DI_D_ROLL: Array
+    DI_D_PITCH: Array
+    DI_D_YAW: Array
+    DI_D_PARAMS: Array
+    DI_D_ACC: Array
 
     # Configs (used in testing)
     available_configs: tuple[str] = ("cf2x_L250", "cf2x_P250", "cf2x_T350")

@@ -69,7 +69,7 @@ def f_first_principles(
         forces_motor_dot = None
         forces_motor = command
     else:
-        forces_motor_dot = constants.THRUST_TAU * (command - forces_motor)  # TODO add dt = 1/200
+        forces_motor_dot = constants.THRUST_TAU * (command - forces_motor)  # TODO 1/TAU
     # Creating force and torque vector
     forces_motor_tot = xp.sum(forces_motor, axis=-1)
     # forces_motor_tot = xp.sum(
@@ -122,14 +122,61 @@ def f_fitted_DI_rpyt(
 ) -> tuple[Array, Array, Array, Array, Array | None]:
     """The fitted double integrator (DI) model.
 
+    For full description see corresponding core function.
+    """
+    if forces_motor is not None:
+        raise NotImplementedError("The fitted_DI_rpyt model does not support motor dynamics!")
+    return f_fitted_DI_rpyt_core(
+        pos, quat, vel, ang_vel, command, constants, forces_motor, forces_dist, torques_dist
+    )
+
+
+def f_fitted_DI_D_rpyt(
+    pos: Array,
+    quat: Array,
+    vel: Array,
+    ang_vel: Array,
+    command: Array,
+    constants: Constants,
+    forces_motor: Array | None = None,
+    forces_dist: Array | None = None,
+    torques_dist: Array | None = None,
+) -> tuple[Array, Array, Array, Array, Array | None]:
+    """The fitted double integrator with motor delay (DI_D) model.
+
+    For full description see corresponding core function.
+    """
+    if forces_motor is None:
+        raise NotImplementedError(
+            "The fitted_DI_rpyt model only supports motor dynamics activated!"
+        )
+    return f_fitted_DI_rpyt_core(
+        pos, quat, vel, ang_vel, command, constants, forces_motor, forces_dist, torques_dist
+    )
+
+
+def f_fitted_DI_rpyt_core(
+    pos: Array,
+    quat: Array,
+    vel: Array,
+    ang_vel: Array,
+    command: Array,
+    constants: Constants,
+    forces_motor: Array | None = None,
+    forces_dist: Array | None = None,
+    torques_dist: Array | None = None,
+) -> tuple[Array, Array, Array, Array, Array | None]:
+    """The fitted double integrator (DI) model with optional motor delay (D).
+
     Args:
-        pos (Array): Position of the drone
+        pos (Array): Position of the drone (m)
         quat (Array): Quaternion of the drone (xyzw)
-        vel (Array): Velocity of the drone
-        ang_vel (Array): Angular velocity of the drone
+        vel (Array): Velocity of the drone (m/s)
+        ang_vel (Array): Angular velocity of the drone (rad/s)
         command (Array): RPYT command (roll, pitch, yaw in rad, thrust in N)
-        constants (Constants): _description_
-        forces_motor (Array | None, optional): _description_. Defaults to None.
+        constants (Constants): Containing the constants of the drone
+        forces_motor (Array | None, optional): Thrust of the 4 motors in N. Defaults to None.
+            If None, the commanded thrust is directly applied. If value is given, thrust dynamics are calculated.
         forces_dist (Array | None, optional): _description_. Defaults to None.
         torques_dist (Array | None, optional): _description_. Defaults to None.
 
@@ -148,38 +195,38 @@ def f_fitted_DI_rpyt(
     # rpy_rates = rot.apply(ang_vel)  # WRONG
     rpy_rates = R.ang_vel2rpy_rates(quat, ang_vel)
 
-    if forces_motor is not None:
-        print("[WARNING] This model does not work with motor dynamics and ignores them!")
+    if forces_motor is None:
+        forces_motor_dot = None
+        thrust = (constants.DI_ACC[0] + constants.DI_ACC[1] * cmd_f) / constants.MASS
+    else:
+        # Note: Due to the structure of the integrator, we split the commanded thrust into
+        # four equal parts and later apply the sum as total thrust again. Those four forces
+        # are not the true forces of the motors, but the sum is the true total thrust.
+        forces_motor_dot = 1 / constants.DI_D_ACC[2] * (cmd_f[..., None] / 4 - forces_motor)
+        forces_sum = xp.sum(forces_motor, axis=-1)
+        thrust = (constants.DI_D_ACC[0] + constants.DI_D_ACC[1] * forces_sum) / constants.MASS
 
-    coeff = (constants.DI_ACC[0] + constants.DI_ACC[1] * cmd_f) / constants.MASS
-
-    cos_x3 = xp.cos(euler_angles[..., 0])  # roll
-    sin_x3 = xp.sin(euler_angles[..., 0])  # roll
-    cos_x4 = xp.cos(euler_angles[..., 1])  # pitch
-    sin_x4 = xp.sin(euler_angles[..., 1])  # pitch
-    cos_x5 = xp.cos(euler_angles[..., 2])  # yaw
-    sin_x5 = xp.sin(euler_angles[..., 2])  # yaw
-    rotation_matrix = xp.stack(
-        [
-            cos_x3 * sin_x4 * cos_x5 + sin_x3 * sin_x5,
-            cos_x3 * sin_x4 * sin_x5 - sin_x3 * cos_x5,
-            cos_x3 * cos_x4,
-        ],
-        axis=-1,
-    )
+    drone_z_axis = rot.inv().as_matrix()[..., -1, :]
 
     pos_dot = vel
-    vel_dot = coeff[..., None] * rotation_matrix + constants.GRAVITY_VEC
+    vel_dot = thrust[..., None] * drone_z_axis + constants.GRAVITY_VEC
     if forces_dist is not None:
         vel_dot = vel_dot + forces_dist / constants.MASS
 
     # Rotational equation of motion
     quat_dot = quat_dot_from_ang_vel(quat, ang_vel)
-    rpy_rates_dot = (
-        constants.DI_PARAMS[:, 0] * euler_angles
-        + constants.DI_PARAMS[:, 1] * rpy_rates
-        + constants.DI_PARAMS[:, 2] * cmd_rpy
-    )
+    if forces_motor is None:
+        rpy_rates_dot = (
+            constants.DI_PARAMS[:, 0] * euler_angles
+            + constants.DI_PARAMS[:, 1] * rpy_rates
+            + constants.DI_PARAMS[:, 2] * cmd_rpy
+        )
+    else:
+        rpy_rates_dot = (
+            constants.DI_D_PARAMS[:, 0] * euler_angles
+            + constants.DI_D_PARAMS[:, 1] * rpy_rates
+            + constants.DI_D_PARAMS[:, 2] * cmd_rpy
+        )
     # ang_vel_dot = rot.apply(rpy_rates_dot, inverse=True)  # WRONG
     ang_vel_dot = R.rpy_rates2ang_vel(quat, rpy_rates_dot)
     if torques_dist is not None:
@@ -194,14 +241,4 @@ def f_fitted_DI_rpyt(
         # back to angular acceleration
         ang_vel_dot = xp.matvec(constants.J_INV, torque)
 
-    return pos_dot, quat_dot, vel_dot, ang_vel_dot, None
-
-
-# f = model_dynamics("cf2x+", "analytical")
-
-# # Single value
-# f(np.array([1,1,1]), np.array([1,1,1]), np.array([0,0,0,1]), np.array([1,1,1]), np.array([1,1,1,1]), np.array([1,1,1,1]))
-
-# # Batched value
-# f(np.array([[1,1,1],[1,1,1]]), np.array([[1,1,1],[1,1,1]]), np.array([[0,0,0,1],[0,0,0,1]]),
-#   np.array([[1,1,1],[1,1,1]]), np.array([[1,1,1,1],[1,1,1,1]]), np.array([[1,1,1,1],[1,1,1,1]]))
+    return pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot
