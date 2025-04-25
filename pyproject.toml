@@ -22,7 +22,7 @@ test = ["pytest>=8.0.0", "pytest-cov", "pytest-timeout"]
 find = {}
 
 [tool.setuptools.package-data]
-crazyflow = ["lsy_models/data/*.xml"]
+lsy_models = ["lsy_models/data/*.xml"]
 
 [tool.pytest.ini_options]
 markers = ["unit", "integration", "render"]
