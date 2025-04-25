@@ -13,7 +13,6 @@ jobs:
           environment-name: test-env
           init-shell: bash
           create-args: python=3.11
-          cache-environment: true
       - name: Install dependencies and package
         run: pip install .[test]
         shell: micromamba-shell {0}
