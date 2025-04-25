@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 
 import casadi as cs
 import jax.numpy as jp
-import numpy as np
 from jax.scipy.spatial.transform import Rotation as JR
 from scipy.spatial.transform import Rotation as R
 
@@ -126,9 +125,7 @@ def casadi_quat2euler(quat: cs.MX, seq: str = "xyz", degrees: bool = False) -> c
         )
 
     if any(seq[i] == seq[i + 1] for i in range(2)):
-        raise ValueError(
-            "Expected consecutive axes to be different, got {}".format(seq)
-        )
+        raise ValueError("Expected consecutive axes to be different, got {}".format(seq))
 
     seq = seq.lower()
 

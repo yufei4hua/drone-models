@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import numpy as np
-
 if TYPE_CHECKING:
     from jax import Array as JaxArray
     from numpy.typing import NDArray
@@ -16,9 +14,7 @@ if TYPE_CHECKING:
     Array = NDArray | JaxArray | Tensor
 
 
-def force2pwm(
-    thrust: Array | float, constants: Constants, perMotor: bool = False
-) -> Array | float:
+def force2pwm(thrust: Array | float, constants: Constants, perMotor: bool = False) -> Array | float:
     """Convert thrust in N to thrust in PWM.
 
     Args:
@@ -35,9 +31,7 @@ def force2pwm(
     return ratio * constants.PWM_MAX
 
 
-def pwm2force(
-    pwm: Array | float, constants: Constants, perMotor: bool = False
-) -> Array | float:
+def pwm2force(pwm: Array | float, constants: Constants, perMotor: bool = False) -> Array | float:
     """Convert pwm thrust command to actual thrust.
 
     Args:

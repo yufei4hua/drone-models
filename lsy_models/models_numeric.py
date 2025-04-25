@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import lsy_models.utils.cf2 as cf2
 import lsy_models.utils.rotation as R
 
 if TYPE_CHECKING:
