@@ -147,7 +147,7 @@ def f_fitted_DI_D_rpyt(
     """
     if forces_motor is None:
         raise NotImplementedError(
-            "The fitted_DI_rpyt model only supports motor dynamics activated!"
+            "The fitted_DI_D_rpyt model only supports motor dynamics activated!"
         )
     return f_fitted_DI_rpyt_core(
         pos, quat, vel, ang_vel, command, constants, forces_motor, forces_dist, torques_dist
