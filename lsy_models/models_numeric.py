@@ -179,9 +179,6 @@ def f_fitted_DI_rpyt_core(
         forces_dist (Array | None, optional): _description_. Defaults to None.
         torques_dist (Array | None, optional): _description_. Defaults to None.
 
-    Raises:
-        NotImplementedError: _description_
-
     Returns:
         tuple[Array, Array, Array, Array, Array | None]: _description_
     """
@@ -191,25 +188,25 @@ def f_fitted_DI_rpyt_core(
     cmd_rpy = command[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
-    # rpy_rates = rot.apply(ang_vel)  # WRONG
     rpy_rates = R.ang_vel2rpy_rates(quat, ang_vel)
 
     if forces_motor is None:
         forces_motor_dot = None
-        thrust = (constants.DI_ACC[0] + constants.DI_ACC[1] * cmd_f) / constants.MASS
+        thrust = constants.DI_ACC[0] + constants.DI_ACC[1] * cmd_f
     else:
         # Note: Due to the structure of the integrator, we split the commanded thrust into
         # four equal parts and later apply the sum as total thrust again. Those four forces
         # are not the true forces of the motors, but the sum is the true total thrust.
         forces_motor_dot = 1 / constants.DI_D_ACC[2] * (cmd_f[..., None] / 4 - forces_motor)
         forces_sum = xp.sum(forces_motor, axis=-1)
-        thrust = (constants.DI_D_ACC[0] + constants.DI_D_ACC[1] * forces_sum) / constants.MASS
+        thrust = constants.DI_D_ACC[0] + constants.DI_D_ACC[1] * forces_sum
 
     drone_z_axis = rot.inv().as_matrix()[..., -1, :]
 
     pos_dot = vel
-    vel_dot = thrust[..., None] * drone_z_axis + constants.GRAVITY_VEC
+    vel_dot = 1.0 / constants.MASS * thrust[..., None] * drone_z_axis + constants.GRAVITY_VEC
     if forces_dist is not None:
+        # Adding force disturbances to the state
         vel_dot = vel_dot + forces_dist / constants.MASS
 
     # Rotational equation of motion
@@ -226,12 +223,10 @@ def f_fitted_DI_rpyt_core(
             + constants.DI_D_PARAMS[:, 1] * rpy_rates
             + constants.DI_D_PARAMS[:, 2] * cmd_rpy
         )
-    # ang_vel_dot = rot.apply(rpy_rates_dot, inverse=True)  # WRONG
     ang_vel_dot = R.rpy_rates2ang_vel(quat, rpy_rates_dot)
     if torques_dist is not None:
-        # adding disturbances to the state
-        # adding torque is a little more complex:
-        # angular acceleration can be converted to torque
+        # adding torque disturbances to the state
+        # angular acceleration can be converted to total torque
         torque = xp.matvec(constants.J, ang_vel_dot) - xp.cross(
             ang_vel, xp.matvec(constants.J, ang_vel)
         )
