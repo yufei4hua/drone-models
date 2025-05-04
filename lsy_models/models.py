@@ -97,6 +97,8 @@ def dynamics_numeric(
             return partial(models_numeric.f_fitted_DI_rpyt, constants=constants)
         case "fitted_DI_D_rpyt":
             return partial(models_numeric.f_fitted_DI_D_rpyt, constants=constants)
+        case "fitted_DI_DD_rpyt":
+            return partial(models_numeric.f_fitted_DI_DD_rpyt, constants=constants)
         case _:
             raise ValueError(f"Model '{model}' is not supported")
 

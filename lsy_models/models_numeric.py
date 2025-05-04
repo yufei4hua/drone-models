@@ -236,3 +236,91 @@ def f_fitted_DI_rpyt_core(
         ang_vel_dot = xp.matvec(constants.J_INV, torque)
 
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot
+
+
+def f_fitted_DI_DD_rpyt(
+    pos: Array,
+    quat: Array,
+    vel: Array,
+    ang_vel: Array,
+    command: Array,
+    constants: Constants,
+    forces_motor: Array | None = None,
+    forces_dist: Array | None = None,
+    torques_dist: Array | None = None,
+) -> tuple[Array, Array, Array, Array, Array | None]:
+    """The fitted double integrator (DI) model with optional motor delay (D).
+
+    Args:
+        pos (Array): Position of the drone (m)
+        quat (Array): Quaternion of the drone (xyzw)
+        vel (Array): Velocity of the drone (m/s)
+        ang_vel (Array): Angular velocity of the drone (rad/s)
+        command (Array): RPYT command (roll, pitch, yaw in rad, thrust in N)
+        constants (Constants): Containing the constants of the drone
+        forces_motor (Array | None, optional): Thrust of the 4 motors in N. Defaults to None.
+            If None, the commanded thrust is directly applied. If value is given, thrust dynamics are calculated.
+        forces_dist (Array | None, optional): _description_. Defaults to None.
+        torques_dist (Array | None, optional): _description_. Defaults to None.
+
+    Returns:
+        tuple[Array, Array, Array, Array, Array | None]: _description_
+    """
+    xp = pos.__array_namespace__()
+    # 13 states
+    cmd_f = command[..., -1]
+    cmd_rpy = command[..., 0:3]
+    rot = R.from_quat(quat)
+    euler_angles = rot.as_euler("xyz")
+    rpy_rates = R.ang_vel2rpy_rates(quat, ang_vel)
+
+    if forces_motor is None:
+        raise NotImplementedError
+    else:
+        # Note: Due to the structure of the integrator, we split the commanded thrust into
+        # four equal parts and later apply the sum as total thrust again. Those four forces
+        # are not the true forces of the motors, but the sum is the true total thrust.
+        forces_motor_dot = 1 / constants.DI_D_ACC[1] * (cmd_f[..., None] / 4 - forces_motor)
+        forces_sum = xp.sum(forces_motor, axis=-1)
+        thrust = constants.DI_D_ACC[0] * forces_sum
+
+    drone_z_axis = rot.inv().as_matrix()[..., -1, :]
+
+    pos_dot = vel
+    vel_dot = (
+        1 / constants.MASS * thrust[..., None] * drone_z_axis
+        + constants.GRAVITY_VEC
+        + constants.DI_DD_ACC[2] * vel
+        + constants.DI_DD_ACC[3] * vel * xp.abs(vel)
+    )
+    if forces_dist is not None:
+        vel_dot = vel_dot + forces_dist / constants.MASS
+
+    # Rotational equation of motion
+    quat_dot = quat_dot_from_ang_vel(quat, ang_vel)
+    if forces_motor is None:
+        rpy_rates_dot = (
+            constants.DI_PARAMS[:, 0] * euler_angles
+            + constants.DI_PARAMS[:, 1] * rpy_rates
+            + constants.DI_PARAMS[:, 2] * cmd_rpy
+        )
+    else:
+        rpy_rates_dot = (
+            constants.DI_D_PARAMS[:, 0] * euler_angles
+            + constants.DI_D_PARAMS[:, 1] * rpy_rates
+            + constants.DI_D_PARAMS[:, 2] * cmd_rpy
+        )
+    ang_vel_dot = R.rpy_rates2ang_vel(quat, rpy_rates_dot)
+    if torques_dist is not None:
+        # adding disturbances to the state
+        # adding torque is a little more complex:
+        # angular acceleration can be converted to torque
+        torque = xp.matvec(constants.J, ang_vel_dot) - xp.cross(
+            ang_vel, xp.matvec(constants.J, ang_vel)
+        )
+        # adding torque
+        torque = torque + torques_dist
+        # back to angular acceleration
+        ang_vel_dot = xp.matvec(constants.J_INV, torque)
+
+    return pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot
