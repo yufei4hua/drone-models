@@ -23,7 +23,7 @@ qx = cs.MX.sym("qx")
 qy = cs.MX.sym("qy")
 qz = cs.MX.sym("qz")
 quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
-rot = R.casadi_quat2matrix(quat)  # Rotation matrix from body to world frame
+rot = R.cs_quat2matrix(quat)  # Rotation matrix from body to world frame
 p = cs.MX.sym("p")
 q = cs.MX.sym("q")
 r = cs.MX.sym("r")
@@ -33,6 +33,14 @@ f2 = cs.MX.sym("f2")
 f3 = cs.MX.sym("f3")
 f4 = cs.MX.sym("f4")
 forces_motor = cs.vertcat(f1, f2, f3, f4)  # Motor thrust
+fx = cs.MX.sym("fx")
+fy = cs.MX.sym("fy")
+fz = cs.MX.sym("fz")
+forces_dist = cs.vertcat(fx, fy, fz)  # Disturbance forces
+tx = cs.MX.sym("tx")
+ty = cs.MX.sym("ty")
+tz = cs.MX.sym("tz")
+torques_dist = cs.vertcat(tx, ty, tz)  # Disturbance torques
 
 # Inputs
 f1_cmd = cs.MX.sym("f1_cmd")
@@ -47,37 +55,67 @@ thrust_cmd = cs.MX.sym("thrust_cmd")
 rpyt_cmd = cs.vertcat(roll_cmd, pitch_cmd, yaw_cmd, thrust_cmd)
 
 
-def first_principles(constants: Constants) -> tuple[cs.MX, cs.MX, cs.MX, cs.MX]:
+def first_principles(
+    constants: Constants,
+    calc_forces_motor: bool = True,
+    calc_forces_dist: bool = False,
+    calc_torques_dist: bool = False,
+) -> tuple[cs.MX, cs.MX, cs.MX, cs.MX]:
     """TODO take from numeric."""
     # States and Inputs
-    X = cs.vertcat(pos, quat, vel, ang_vel, forces_motor)
+    X = cs.vertcat(pos, quat, vel, ang_vel)
+    if calc_forces_motor:
+        X = cs.vertcat(X, forces_motor)
+    if calc_forces_dist:
+        X = cs.vertcat(X, forces_dist)
+    if calc_torques_dist:
+        X = cs.vertcat(X, torques_dist)
     U = cs.vertcat(f1_cmd, f2_cmd, f3_cmd, f4_cmd)
 
     # Defining the dynamics function
-    # Thrust dynamics
-    forces_motor_dot = constants.THRUST_TAU * (U - forces_motor)  # TODO 1/TAU
-    # Creating force and torque vector
-    forces_motor_vec = cs.vertcat(0, 0, cs.sum1(forces_motor))
-    torques_motor_vec = (
-        constants.SIGN_MATRIX.T
-        @ forces_motor
-        * cs.vertcat(constants.L, constants.L, constants.KM / constants.KF)
-    )
+    if calc_forces_motor:
+        # Thrust dynamics
+        forces_motor_dot = constants.THRUST_TAU * (U - forces_motor)  # TODO 1/tau
+        # Creating force and torque vector
+        forces_motor_vec = cs.vertcat(0, 0, cs.sum1(forces_motor))
+        torques_motor_vec = (
+            constants.SIGN_MATRIX.T
+            @ forces_motor
+            * cs.vertcat(constants.L, constants.L, constants.KM / constants.KF)
+        )
+    else:
+        # Creating force and torque vector
+        forces_motor_vec = cs.vertcat(0, 0, cs.sum1(U))
+        torques_motor_vec = (
+            constants.SIGN_MATRIX.T
+            @ U
+            * cs.vertcat(constants.L, constants.L, constants.KM / constants.KF)
+        )
 
     # Linear equation of motion
     pos_dot = vel
-    vel_dot = (
-        rot @ forces_motor_vec / constants.MASS + constants.GRAVITY_VEC
-    )  # TODO add disturbance force
+    vel_dot = rot @ forces_motor_vec / constants.MASS + constants.GRAVITY_VEC
+    if calc_forces_dist:
+        # Adding force disturbances to the state
+        vel_dot = vel_dot + forces_dist / constants.MASS
 
     # Rotational equation of motion
     xi = cs.vertcat(cs.horzcat(0, -ang_vel.T), cs.horzcat(ang_vel, -cs.skew(ang_vel)))
     quat_dot = 0.5 * (xi @ quat)
-    ang_vel_dot = constants.J_INV @ (
-        torques_motor_vec - cs.cross(ang_vel, constants.J @ ang_vel)
-    )  # TODO add disturbance torque (rotated!)
+    ang_vel_dot = constants.J_INV @ (torques_motor_vec - cs.cross(ang_vel, constants.J @ ang_vel))
+    if calc_torques_dist:
+        # adding torque disturbances to the state
+        # angular acceleration can be converted to total torque
+        torque = constants.J @ ang_vel_dot - cs.cross(ang_vel, constants.J @ ang_vel)
+        # adding torque
+        torque = torque + torques_dist
+        # back to angular acceleration
+        ang_vel_dot = constants.J_INV @ torque
 
-    X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot)
+    if calc_forces_motor:
+        X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot)
+    else:
+        X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot)
     Y = cs.vertcat(pos, quat)
 
     return X_dot, X, U, Y
@@ -96,18 +134,21 @@ def f_fitted_DI_D_rpyt(constants: Constants) -> tuple[cs.MX, cs.MX, cs.MX, cs.MX
 def f_fitted_DI_rpyt_core(
     constants: Constants,
     calc_forces_motor: bool = False,
-    calc_forces_dist: bool = False,  # TODO
-    calc_torques_dist: bool = False,  # TODO
+    calc_forces_dist: bool = False,
+    calc_torques_dist: bool = False,
 ) -> tuple[cs.MX, cs.MX, cs.MX, cs.MX]:
     """The fitted double integrator (DI) model with optional motor delay (D).
 
     TODO.
     """
     # States and Inputs
+    X = cs.vertcat(pos, quat, vel, ang_vel)
     if calc_forces_motor:
-        X = cs.vertcat(pos, quat, vel, ang_vel, forces_motor)
-    else:
-        X = cs.vertcat(pos, quat, vel, ang_vel)
+        X = cs.vertcat(X, forces_motor)
+    if calc_forces_dist:
+        X = cs.vertcat(X, forces_dist)
+    if calc_torques_dist:
+        X = cs.vertcat(X, torques_dist)
     U = cs.vertcat(roll_cmd, pitch_cmd, yaw_cmd, thrust_cmd)
 
     # Defining the dynamics function
@@ -127,7 +168,9 @@ def f_fitted_DI_rpyt_core(
     # Linear equation of motion
     pos_dot = vel
     vel_dot = rot @ forces_motor_vec / constants.MASS + constants.GRAVITY_VEC
-    # TODO add disturbance force
+    if calc_forces_dist:
+        # Adding force disturbances to the state
+        vel_dot = vel_dot + forces_dist / constants.MASS
 
     # Rotational equation of motion
     euler_angles = R.casadi_quat2euler(quat)
@@ -152,7 +195,14 @@ def f_fitted_DI_rpyt_core(
             + constants.DI_PARAMS[:, 2] * cs.vertcat(roll_cmd, pitch_cmd, yaw_cmd)
         )
     ang_vel_dot = rpy_rates2ang_vel(quat, rpy_rates_dot)
-    # TODO add disturbance torque
+    if calc_torques_dist:
+        # adding torque disturbances to the state
+        # angular acceleration can be converted to total torque
+        torque = constants.J @ ang_vel_dot - cs.cross(ang_vel, constants.J @ ang_vel)
+        # adding torque
+        torque = torque + torques_dist
+        # back to angular acceleration
+        ang_vel_dot = constants.J_INV @ torque
 
     if calc_forces_motor:
         X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot)
