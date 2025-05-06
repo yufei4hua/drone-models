@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import lsy_models.utils.rotation as R
@@ -14,6 +15,9 @@ if TYPE_CHECKING:
     Array = NDArray | JaxArray | Tensor
 
     from lsy_models.utils.constants import Constants
+
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
 
 
 def quat_dot_from_ang_vel(quat: Array, ang_vel: Array) -> Array:
@@ -146,8 +150,8 @@ def f_fitted_DI_D_rpyt(
     For full description see corresponding core function.
     """
     if forces_motor is None:
-        raise NotImplementedError(
-            "The fitted_DI_D_rpyt model only supports motor dynamics activated!"
+        logger.warning(
+            "The fitted_DI_D_rpyt model only supports motor dynamics activated! Will continue without motor dynamics"
         )
     return f_fitted_DI_rpyt_core(
         pos, quat, vel, ang_vel, command, constants, forces_motor, forces_dist, torques_dist
