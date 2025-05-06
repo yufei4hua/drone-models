@@ -306,94 +306,132 @@ def create_cs_ang_vel2rpy_rates() -> cs.Function:
     qy = cs.MX.sym("qy")
     qz = cs.MX.sym("qz")
     quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
+    rpy = cs_quat2euler(quat)
+    phi, theta = rpy[0], rpy[1]
     p = cs.MX.sym("p")
     q = cs.MX.sym("q")
     r = cs.MX.sym("r")
     ang_vel = cs.vertcat(p, q, r)  # Angular velocity
 
-    rpy = cs_quat2euler(quat)
-    phi, theta = rpy[0], rpy[1]
-
     row1 = cs.horzcat(1, cs.sin(phi) * cs.tan(theta), cs.cos(phi) * cs.tan(theta))
     row2 = cs.horzcat(0, cs.cos(phi), -cs.sin(phi))
     row3 = cs.horzcat(0, cs.sin(phi) / cs.cos(theta), cs.cos(phi) / cs.cos(theta))
 
-    conv_mat = cs.vertcat(row1, row2, row3)
-    rpy_rates = conv_mat @ ang_vel
+    W = cs.vertcat(row1, row2, row3)
+    rpy_rates = W @ ang_vel
 
     return cs.Function("cs_ang_vel2rpy_rates", [quat, ang_vel], [rpy_rates])
 
 
-def create_cs_rpy_rates2ang_vel() -> tuple[cs.MX, cs.MX, cs.MX]:
+cs_ang_vel2rpy_rates = create_cs_ang_vel2rpy_rates()
+
+
+def create_cs_rpy_rates2ang_vel() -> cs.Function:
     """TODO."""
     qw = cs.MX.sym("qw")
     qx = cs.MX.sym("qx")
     qy = cs.MX.sym("qy")
     qz = cs.MX.sym("qz")
     quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
-    dphi = cs.MX.sym("dphi")
-    dtheta = cs.MX.sym("dtheta")
-    dpsi = cs.MX.sym("dpsi")
-    rpy_rates = cs.vertcat(dphi, dtheta, dpsi)  # Euler rates
-
     rpy = cs_quat2euler(quat)
     phi, theta = rpy[0], rpy[1]
+    phi_dot = cs.MX.sym("phi_dot")
+    theta_dot = cs.MX.sym("theta_dot")
+    psi_dot = cs.MX.sym("psi_dot")
+    rpy_rates = cs.vertcat(phi_dot, theta_dot, psi_dot)  # Euler rates
 
     row1 = cs.horzcat(1, 0, -cs.cos(theta) * cs.tan(theta))
     row2 = cs.horzcat(0, cs.cos(phi), cs.sin(phi) * cs.cos(theta))
     row3 = cs.horzcat(0, -cs.sin(phi), cs.cos(phi) * cs.cos(theta))
 
-    conv_mat = cs.vertcat(row1, row2, row3)
-    ang_vel = conv_mat @ rpy_rates
+    W = cs.vertcat(row1, row2, row3)
+    ang_vel = W @ rpy_rates
     return cs.Function("cs_rpy_rates2ang_vel", [quat, rpy_rates], [ang_vel])
 
 
-# def cs_ang_vel_deriv2rpy_rates_deriv() -> tuple[cs.MX, cs.MX, cs.MX]:
-#     """TODO."""
-#     qw = cs.MX.sym("qw")
-#     qx = cs.MX.sym("qx")
-#     qy = cs.MX.sym("qy")
-#     qz = cs.MX.sym("qz")
-#     quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
-#     p = cs.MX.sym("p")
-#     q = cs.MX.sym("q")
-#     r = cs.MX.sym("r")
-#     ang_vel = cs.vertcat(p, q, r)  # Angular velocity
-
-#     rpy = cs_quat2euler(quat)
-#     phi, theta = rpy[0], rpy[1]
-
-#     row1 = cs.horzcat(1, cs.sin(phi) * cs.tan(theta), cs.cos(phi) * cs.tan(theta))
-#     row2 = cs.horzcat(0, cs.cos(phi), -cs.sin(phi))
-#     row3 = cs.horzcat(0, cs.sin(phi) / cs.cos(theta), cs.cos(phi) / cs.cos(theta))
-
-#     conv_mat = cs.vertcat(row1, row2, row3)
-#     rpy_rates = conv_mat @ ang_vel
-#     return quat, ang_vel, ang_vel_deriv, rpy_rates_deriv
+cs_rpy_rates2ang_vel = create_cs_rpy_rates2ang_vel()
 
 
-# def cs_rpy_rates_deriv2ang_vel_deriv() -> tuple[cs.MX, cs.MX, cs.MX]:
-#     """TODO."""
-#     qw = cs.MX.sym("qw")
-#     qx = cs.MX.sym("qx")
-#     qy = cs.MX.sym("qy")
-#     qz = cs.MX.sym("qz")
-#     quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
-#     dphi = cs.MX.sym("dphi")
-#     dtheta = cs.MX.sym("dtheta")
-#     dpsi = cs.MX.sym("dpsi")
-#     rpy_rates = cs.vertcat(dphi, dtheta, dpsi)  # Euler rates
+def create_cs_ang_vel_deriv2rpy_rates_deriv() -> cs.Function:
+    """TODO."""
+    qw = cs.MX.sym("qw")
+    qx = cs.MX.sym("qx")
+    qy = cs.MX.sym("qy")
+    qz = cs.MX.sym("qz")
+    quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
+    rpy = cs_quat2euler(quat)
+    phi, theta = rpy[0], rpy[1]
+    p = cs.MX.sym("p")
+    q = cs.MX.sym("q")
+    r = cs.MX.sym("r")
+    ang_vel = cs.vertcat(p, q, r)  # Angular velocity
+    p_dot = cs.MX.sym("p_dot")
+    q_dot = cs.MX.sym("q_dot")
+    r_dot = cs.MX.sym("r_dot")
+    ang_vel_deriv = cs.vertcat(p_dot, q_dot, r_dot)  # Angular acceleration
+    rpy_rates = cs_ang_vel2rpy_rates(quat, ang_vel)
+    phi_dot, theta_dot = rpy_rates[0], rpy_rates[1]
 
-#     rpy = cs_quat2euler(quat)
-#     phi, theta = rpy[0], rpy[1]
+    row1 = cs.horzcat(
+        0,
+        cs.cos(phi) * phi_dot * cs.tan(theta) + cs.sin(phi) * theta_dot / cs.cos(theta) ** 2,
+        -cs.sin(phi) * phi_dot * cs.tan(theta) + cs.cos(phi) * theta_dot / cs.cos(theta) ** 2,
+    )
+    row2 = cs.horzcat(0, -cs.sin(phi) * phi_dot, -cs.cos(phi) * phi_dot)
+    row3 = cs.horzcat(
+        0,
+        cs.cos(phi) * phi_dot / cs.cos(theta)
+        + cs.sin(phi) * theta_dot * cs.sin(theta) / cs.cos(theta) ** 2,
+        -cs.sin(phi) * phi_dot / cs.cos(theta)
+        + cs.cos(phi) * cs.sin(theta) * theta_dot / cs.cos(theta) ** 2,
+    )
 
-#     row1 = cs.horzcat(1, 0, -cs.cos(theta) * cs.tan(theta))
-#     row2 = cs.horzcat(0, cs.cos(phi), cs.sin(phi) * cs.cos(theta))
-#     row3 = cs.horzcat(0, -cs.sin(phi), cs.cos(phi) * cs.cos(theta))
+    W_dot = cs.vertcat(row1, row2, row3)
+    rpy_rates_deriv = W_dot @ ang_vel + cs_ang_vel2rpy_rates(quat, ang_vel_deriv)
 
-#     conv_mat = cs.vertcat(row1, row2, row3)
-#     ang_vel = conv_mat @ rpy_rates
-#     return quat, rpy_rates, rpy_rates_deriv, ang_vel_deriv
+    return cs.Function("cs_ang_vel2rpy_rates", [quat, ang_vel, ang_vel_deriv], [rpy_rates_deriv])
+
+
+cs_ang_vel_deriv2rpy_rates_deriv = create_cs_ang_vel_deriv2rpy_rates_deriv()
+
+
+def create_cs_rpy_rates_deriv2ang_vel_deriv() -> cs.Function:
+    """TODO."""
+    qw = cs.MX.sym("qw")
+    qx = cs.MX.sym("qx")
+    qy = cs.MX.sym("qy")
+    qz = cs.MX.sym("qz")
+    quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
+    rpy = cs_quat2euler(quat)
+    phi, theta = rpy[0], rpy[1]
+    phi_dot = cs.MX.sym("phi_dot")
+    theta_dot = cs.MX.sym("theta_dot")
+    psi_dot = cs.MX.sym("psi_dot")
+    rpy_rates = cs.vertcat(phi_dot, theta_dot, psi_dot)  # Euler rates
+    phi_dot_dot = cs.MX.sym("phi_dot_dot")
+    theta_dot_dot = cs.MX.sym("theta_dot_dot")
+    psi_dot_dot = cs.MX.sym("psi_dot_dot")
+    rpy_rates_deriv = cs.vertcat(phi_dot_dot, theta_dot_dot, psi_dot_dot)  # Euler rates derivative
+
+    row1 = cs.horzcat(0, 0, -cs.cos(theta) * theta_dot)
+    row2 = cs.horzcat(
+        0,
+        -cs.sin(phi) * phi_dot,
+        cs.cos(phi) * phi_dot * cs.cos(theta) - cs.sin(phi) * cs.sin(theta) * theta_dot,
+    )
+    row3 = cs.horzcat(
+        0,
+        -cs.cos(phi) * phi_dot,
+        -cs.sin(phi) * phi_dot * cs.cos(theta) - cs.cos(phi) * cs.sin(theta) * theta_dot,
+    )
+
+    W_dot = cs.vertcat(row1, row2, row3)
+    ang_vel_deriv = W_dot @ rpy_rates + cs_rpy_rates2ang_vel(quat, rpy_rates_deriv)
+
+    return cs.Function("cs_ang_vel2rpy_rates", [quat, rpy_rates, rpy_rates_deriv], [ang_vel_deriv])
+
+
+cs_rpy_rates_deriv2ang_vel_deriv = create_cs_rpy_rates_deriv2ang_vel_deriv()
 
 
 def cs_quat2matrix(quat: cs.MX) -> cs.MX:

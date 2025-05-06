@@ -124,9 +124,8 @@ def test_ang_vel2rpy_rates_symbolic():
     rpy_rates = R.ang_vel2rpy_rates(quats, ang_vels)
 
     # Compare to casadi implementation
-    cs_ang_vel2rpy_rates = R.create_cs_ang_vel2rpy_rates()
     for i in range(len(ang_vels)):
-        rpy_rates_cs = np.array(cs_ang_vel2rpy_rates(quats[i], ang_vels[i])).flatten()
+        rpy_rates_cs = np.array(R.cs_ang_vel2rpy_rates(quats[i], ang_vels[i])).flatten()
         assert np.allclose(rpy_rates_cs, rpy_rates[i]), "Symbolic and numeric results differ."
 
 
@@ -140,9 +139,8 @@ def test_rpy_rates2ang_vel_symbolic():
     ang_vels = R.rpy_rates2ang_vel(quats, rpy_rates)
 
     # Compare to casadi implementation
-    cs_rpy_rates2ang_vel = R.create_cs_rpy_rates2ang_vel()
     for i in range(len(rpy_rates)):
-        ang_vel_cs = np.array(cs_rpy_rates2ang_vel(quats[i], rpy_rates[i])).flatten()
+        ang_vel_cs = np.array(R.cs_rpy_rates2ang_vel(quats[i], rpy_rates[i])).flatten()
         assert np.allclose(ang_vel_cs, ang_vels[i]), "Symbolic and numeric results differ."
 
 
@@ -201,21 +199,45 @@ def test_rpy_rates_deriv2ang_vel_deriv_batching():
         )
 
 
-# @pytest.mark.unit
-# def test_ang_vel_deriv2rpy_rates_deriv_symbolic():
-#     """TODO."""
-#     quats = np.array(create_uniform_quats())
-#     ang_vels = np.array(create_uniform_ang_vel())
-#     ang_vels_deriv = np.array(create_uniform_ang_vel())
-#     rpy_rates = R.ang_vel2rpy_rates(quats, ang_vels)
+@pytest.mark.unit
+def test_ang_vel_deriv2rpy_rates_deriv_symbolic():
+    """TODO."""
+    quats = np.array(create_uniform_quats())
+    ang_vels = np.array(create_uniform_ang_vel())
+    ang_vels_deriv = np.array(create_uniform_ang_vel())
+    rpy_rates = R.ang_vel2rpy_rates(quats, ang_vels)
 
-#     # Calculate batched version
-#     rpy_rates_deriv = R.ang_vel_deriv2rpy_rates_deriv(quats, ang_vels, ang_vels_deriv)
+    # Calculate batched version
+    rpy_rates_deriv = R.ang_vel_deriv2rpy_rates_deriv(quats, ang_vels, ang_vels_deriv)
 
-#     # Compare to casadi implementation
-#     cs_quat, cs_ang_vel, cs_rpy_rates = R.cs_ang_vel2rpy_rates()
-#     ang_vel2rpy_rates = cs.Function("ang_vel2rpy_rates", [cs_quat, cs_ang_vel], [cs_rpy_rates])
-#     for i in range(len(ang_vels)):
-#         # TODO test against casadi implementation
-#         rpy_rates_cs = np.array(ang_vel2rpy_rates(quats[i], ang_vels[i])).flatten()
-#         assert np.allclose(rpy_rates_cs, rpy_rates[i]), "Batched and non-batched results differ."
+    # Compare to casadi implementation
+    for i in range(len(ang_vels)):
+        # TODO test against casadi implementation
+        rpy_rates_deriv_cs = np.array(
+            R.cs_ang_vel_deriv2rpy_rates_deriv(quats[i], ang_vels[i], ang_vels_deriv[i])
+        ).flatten()
+        assert np.allclose(rpy_rates_deriv_cs, rpy_rates_deriv[i]), (
+            "Symbolic and numeric results differ."
+        )
+
+
+@pytest.mark.unit
+def test_rpy_rates_deriv2ang_vel_deriv_symbolic():
+    """TODO."""
+    quats = np.array(create_uniform_quats())
+    rpy_rates = np.array(create_uniform_ang_vel())
+    rpy_rates_deriv = np.array(create_uniform_ang_vel())
+    ang_vels = R.rpy_rates2ang_vel(quats, rpy_rates)
+
+    # Calculate batched version
+    ang_vels_deriv = R.rpy_rates_deriv2ang_vel_deriv(quats, rpy_rates, rpy_rates_deriv)
+
+    # Compare to casadi implementation
+    for i in range(len(rpy_rates)):
+        # TODO test against casadi implementation
+        ang_vels_deriv_cs = np.array(
+            R.cs_rpy_rates_deriv2ang_vel_deriv(quats[i], rpy_rates[i], rpy_rates_deriv[i])
+        ).flatten()
+        assert np.allclose(ang_vels_deriv_cs, ang_vels_deriv[i]), (
+            "Symbolic and numeric results differ."
+        )
