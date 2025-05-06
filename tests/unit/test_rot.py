@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import casadi as cs
 import jax.numpy as jp
 import numpy as np
 import pytest
@@ -205,7 +204,6 @@ def test_ang_vel_deriv2rpy_rates_deriv_symbolic():
     quats = np.array(create_uniform_quats())
     ang_vels = np.array(create_uniform_ang_vel())
     ang_vels_deriv = np.array(create_uniform_ang_vel())
-    rpy_rates = R.ang_vel2rpy_rates(quats, ang_vels)
 
     # Calculate batched version
     rpy_rates_deriv = R.ang_vel_deriv2rpy_rates_deriv(quats, ang_vels, ang_vels_deriv)
@@ -227,7 +225,6 @@ def test_rpy_rates_deriv2ang_vel_deriv_symbolic():
     quats = np.array(create_uniform_quats())
     rpy_rates = np.array(create_uniform_ang_vel())
     rpy_rates_deriv = np.array(create_uniform_ang_vel())
-    ang_vels = R.rpy_rates2ang_vel(quats, rpy_rates)
 
     # Calculate batched version
     ang_vels_deriv = R.rpy_rates_deriv2ang_vel_deriv(quats, rpy_rates, rpy_rates_deriv)
