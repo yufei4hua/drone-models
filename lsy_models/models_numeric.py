@@ -223,7 +223,7 @@ def f_fitted_DI_rpyt_core(
             + constants.DI_D_PARAMS[:, 1] * rpy_rates
             + constants.DI_D_PARAMS[:, 2] * cmd_rpy
         )
-    ang_vel_dot = R.rpy_rates2ang_vel(quat, rpy_rates_dot)
+    ang_vel_dot = R.rpy_rates_deriv2ang_vel_deriv(quat, rpy_rates, rpy_rates_dot)
     if torques_dist is not None:
         # adding torque disturbances to the state
         # angular acceleration can be converted to total torque

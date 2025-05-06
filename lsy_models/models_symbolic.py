@@ -174,12 +174,10 @@ def f_fitted_DI_rpyt_core(
 
     # Rotational equation of motion
     euler_angles = R.cs_quat2euler(quat)
-    ang_vel2rpy_rates = R.create_cs_ang_vel2rpy_rates()
-    rpy_rates2ang_vel = R.create_cs_rpy_rates2ang_vel()
 
     xi = cs.vertcat(cs.horzcat(0, -ang_vel.T), cs.horzcat(ang_vel, -cs.skew(ang_vel)))
     quat_dot = 0.5 * (xi @ quat)
-    rpy_rates = ang_vel2rpy_rates(quat, ang_vel)
+    rpy_rates = R.cs_ang_vel2rpy_rates(quat, ang_vel)
     if calc_forces_motor:
         rpy_rates_dot = (
             constants.DI_D_PARAMS[:, 0] * euler_angles
@@ -192,7 +190,7 @@ def f_fitted_DI_rpyt_core(
             + constants.DI_PARAMS[:, 1] * rpy_rates
             + constants.DI_PARAMS[:, 2] * cs.vertcat(roll_cmd, pitch_cmd, yaw_cmd)
         )
-    ang_vel_dot = rpy_rates2ang_vel(quat, rpy_rates_dot)
+    ang_vel_dot = R.cs_rpy_rates_deriv2ang_vel_deriv(quat, rpy_rates, rpy_rates_dot)
     if calc_torques_dist:
         # adding torque disturbances to the state
         # angular acceleration can be converted to total torque
