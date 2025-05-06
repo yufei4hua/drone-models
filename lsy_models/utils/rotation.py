@@ -71,7 +71,7 @@ def ang_vel2rpy_rates(quat: Array, ang_vel: Array) -> Array:
     one = xp.ones_like(phi)
     zero = xp.zeros_like(phi)
 
-    conv_mat = xp.stack(
+    W = xp.stack(
         [
             xp.stack([one, sin_phi * tan_theta, cos_phi * tan_theta], axis=-1),
             xp.stack([zero, cos_phi, -sin_phi], axis=-1),
@@ -80,7 +80,7 @@ def ang_vel2rpy_rates(quat: Array, ang_vel: Array) -> Array:
         axis=-2,
     )
 
-    return xp.matmul(conv_mat, ang_vel[..., None])[..., 0]
+    return xp.matmul(W, ang_vel[..., None])[..., 0]
 
 
 def rpy_rates2ang_vel(quat: Array, rpy_rates: Array) -> Array:
@@ -97,7 +97,7 @@ def rpy_rates2ang_vel(quat: Array, rpy_rates: Array) -> Array:
     one = xp.ones_like(phi)
     zero = xp.zeros_like(phi)
 
-    conv_mat = xp.stack(
+    W = xp.stack(
         [
             xp.stack([one, zero, -cos_theta * tan_theta], axis=-1),
             xp.stack([zero, cos_phi, sin_phi * cos_theta], axis=-1),
@@ -106,10 +106,98 @@ def rpy_rates2ang_vel(quat: Array, rpy_rates: Array) -> Array:
         axis=-2,
     )
 
-    return xp.matmul(conv_mat, rpy_rates[..., None])[..., 0]
+    return xp.matmul(W, rpy_rates[..., None])[..., 0]
 
 
-def casadi_quat2euler(quat: cs.MX, seq: str = "xyz", degrees: bool = False) -> cs.MX:
+def ang_vel_deriv2rpy_rates_deriv(quat: Array, ang_vel: Array, ang_vel_deriv: Array) -> Array:
+    r"""Convert rpy rates derivatives to angular velocity derivatives.
+
+    .. math::
+        \dot{\psi} = \mathbf{\dot{W}}\mathbf{\omega} + \mathbf{W} \dot{\mathbf{\omega}}
+    """
+    xp = quat.__array_namespace__()
+    rpy = from_quat(quat).as_euler("xyz")
+    phi, theta = rpy[..., 0], rpy[..., 1]
+    rpy_rates = ang_vel2rpy_rates(quat, ang_vel)
+    phi_dot, theta_dot = rpy_rates[..., 0], rpy_rates[..., 1]
+
+    sin_phi = xp.sin(phi)
+    cos_phi = xp.cos(phi)
+    sin_theta = xp.sin(theta)
+    cos_theta = xp.cos(theta)
+    tan_theta = xp.tan(theta)
+
+    zero = xp.zeros_like(phi)
+
+    W_dot = xp.stack(
+        [
+            xp.stack(
+                [
+                    zero,
+                    cos_phi * phi_dot * tan_theta + sin_phi * theta_dot / cos_theta**2,
+                    -sin_phi * phi_dot * tan_theta + cos_phi * theta_dot / cos_theta**2,
+                ],
+                axis=-1,
+            ),
+            xp.stack([zero, -sin_phi * phi_dot, -cos_phi * phi_dot], axis=-1),
+            xp.stack(
+                [
+                    zero,
+                    cos_phi * phi_dot / cos_theta + sin_phi * theta_dot * sin_theta / cos_theta**2,
+                    -sin_phi * phi_dot / cos_theta + cos_phi * sin_theta * theta_dot / cos_theta**2,
+                ],
+                axis=-1,
+            ),
+        ],
+        axis=-2,
+    )
+    return xp.matmul(W_dot, ang_vel[..., None])[..., 0] + ang_vel2rpy_rates(quat, ang_vel_deriv)
+
+
+def rpy_rates_deriv2ang_vel_deriv(quat: Array, rpy_rates: Array, rpy_rates_deriv: Array) -> Array:
+    r"""Convert rpy rates derivatives to angular velocity derivatives.
+
+    .. math::
+        \dot{\omega} = \mathbf{\dot{W}}\dot{\mathbf{\psi}} + \mathbf{W} \ddot{\mathbf{\psi}}
+    """
+    xp = quat.__array_namespace__()
+    rpy = from_quat(quat).as_euler("xyz")
+    phi, theta = rpy[..., 0], rpy[..., 1]
+    phi_dot, theta_dot = rpy_rates[..., 0], rpy_rates[..., 1]
+
+    sin_phi = xp.sin(phi)
+    cos_phi = xp.cos(phi)
+    sin_theta = xp.sin(theta)
+    cos_theta = xp.cos(theta)
+
+    zero = xp.zeros_like(phi)
+
+    W_dot = xp.stack(
+        [
+            xp.stack([zero, zero, -cos_theta * theta_dot], axis=-1),
+            xp.stack(
+                [
+                    zero,
+                    -sin_phi * phi_dot,
+                    cos_phi * phi_dot * cos_theta - sin_phi * sin_theta * theta_dot,
+                ],
+                axis=-1,
+            ),
+            xp.stack(
+                [
+                    zero,
+                    -cos_phi * phi_dot,
+                    -sin_phi * phi_dot * cos_theta - cos_phi * sin_theta * theta_dot,
+                ],
+                axis=-1,
+            ),
+        ],
+        axis=-2,
+    )
+    return xp.matmul(W_dot, rpy_rates[..., None])[..., 0] + rpy_rates2ang_vel(quat, rpy_rates_deriv)
+
+
+def cs_quat2euler(quat: cs.MX, seq: str = "xyz", degrees: bool = False) -> cs.MX:
     """TODO."""
     if len(seq) != 3:
         raise ValueError(f"Expected 3 axes, got {len(seq)}.")
@@ -211,7 +299,7 @@ def casadi_quat2euler(quat: cs.MX, seq: str = "xyz", degrees: bool = False) -> c
     return angles
 
 
-def casadi_ang_vel2rpy_rates() -> tuple[cs.MX, cs.MX, cs.MX]:
+def cs_ang_vel2rpy_rates() -> tuple[cs.MX, cs.MX, cs.MX]:
     """TODO."""
     qw = cs.MX.sym("qw")
     qx = cs.MX.sym("qx")
@@ -223,7 +311,7 @@ def casadi_ang_vel2rpy_rates() -> tuple[cs.MX, cs.MX, cs.MX]:
     r = cs.MX.sym("r")
     ang_vel = cs.vertcat(p, q, r)  # Angular velocity
 
-    rpy = casadi_quat2euler(quat)
+    rpy = cs_quat2euler(quat)
     phi, theta = rpy[0], rpy[1]
 
     row1 = cs.horzcat(1, cs.sin(phi) * cs.tan(theta), cs.cos(phi) * cs.tan(theta))
@@ -235,7 +323,7 @@ def casadi_ang_vel2rpy_rates() -> tuple[cs.MX, cs.MX, cs.MX]:
     return quat, ang_vel, rpy_rates
 
 
-def casadi_rpy_rates2ang_vel() -> tuple[cs.MX, cs.MX, cs.MX]:
+def cs_rpy_rates2ang_vel() -> tuple[cs.MX, cs.MX, cs.MX]:
     """TODO."""
     qw = cs.MX.sym("qw")
     qx = cs.MX.sym("qx")
@@ -247,7 +335,7 @@ def casadi_rpy_rates2ang_vel() -> tuple[cs.MX, cs.MX, cs.MX]:
     dpsi = cs.MX.sym("dpsi")
     rpy_rates = cs.vertcat(dphi, dtheta, dpsi)  # Euler rates
 
-    rpy = casadi_quat2euler(quat)
+    rpy = cs_quat2euler(quat)
     phi, theta = rpy[0], rpy[1]
 
     row1 = cs.horzcat(1, 0, -cs.cos(theta) * cs.tan(theta))
@@ -259,7 +347,55 @@ def casadi_rpy_rates2ang_vel() -> tuple[cs.MX, cs.MX, cs.MX]:
     return quat, rpy_rates, ang_vel
 
 
-def casadi_quat2matrix(quat: cs.MX) -> cs.MX:
+# def cs_ang_vel_deriv2rpy_rates_deriv() -> tuple[cs.MX, cs.MX, cs.MX]:
+#     """TODO."""
+#     qw = cs.MX.sym("qw")
+#     qx = cs.MX.sym("qx")
+#     qy = cs.MX.sym("qy")
+#     qz = cs.MX.sym("qz")
+#     quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
+#     p = cs.MX.sym("p")
+#     q = cs.MX.sym("q")
+#     r = cs.MX.sym("r")
+#     ang_vel = cs.vertcat(p, q, r)  # Angular velocity
+
+#     rpy = cs_quat2euler(quat)
+#     phi, theta = rpy[0], rpy[1]
+
+#     row1 = cs.horzcat(1, cs.sin(phi) * cs.tan(theta), cs.cos(phi) * cs.tan(theta))
+#     row2 = cs.horzcat(0, cs.cos(phi), -cs.sin(phi))
+#     row3 = cs.horzcat(0, cs.sin(phi) / cs.cos(theta), cs.cos(phi) / cs.cos(theta))
+
+#     conv_mat = cs.vertcat(row1, row2, row3)
+#     rpy_rates = conv_mat @ ang_vel
+#     return quat, ang_vel, ang_vel_deriv, rpy_rates_deriv
+
+
+# def cs_rpy_rates_deriv2ang_vel_deriv() -> tuple[cs.MX, cs.MX, cs.MX]:
+#     """TODO."""
+#     qw = cs.MX.sym("qw")
+#     qx = cs.MX.sym("qx")
+#     qy = cs.MX.sym("qy")
+#     qz = cs.MX.sym("qz")
+#     quat = cs.vertcat(qx, qy, qz, qw)  # Quaternions
+#     dphi = cs.MX.sym("dphi")
+#     dtheta = cs.MX.sym("dtheta")
+#     dpsi = cs.MX.sym("dpsi")
+#     rpy_rates = cs.vertcat(dphi, dtheta, dpsi)  # Euler rates
+
+#     rpy = cs_quat2euler(quat)
+#     phi, theta = rpy[0], rpy[1]
+
+#     row1 = cs.horzcat(1, 0, -cs.cos(theta) * cs.tan(theta))
+#     row2 = cs.horzcat(0, cs.cos(phi), cs.sin(phi) * cs.cos(theta))
+#     row3 = cs.horzcat(0, -cs.sin(phi), cs.cos(phi) * cs.cos(theta))
+
+#     conv_mat = cs.vertcat(row1, row2, row3)
+#     ang_vel = conv_mat @ rpy_rates
+#     return quat, rpy_rates, rpy_rates_deriv, ang_vel_deriv
+
+
+def cs_quat2matrix(quat: cs.MX) -> cs.MX:
     """Creates a symbolic rotation matrix based on a symbolic quaternion.
 
     From https://github.com/cmower/spatial-casadi/blob/master/spatial_casadi/spatial.py

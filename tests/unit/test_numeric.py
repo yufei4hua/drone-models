@@ -25,29 +25,29 @@ jax.config.update("jax_enable_x64", True)
 N = 1000
 
 
-def create_rnd_states(N: int = 1000) -> tuple[Array, Array, Array, Array, Array]:
+def create_rnd_states(N: int = 1000) -> tuple[Array, Array, Array, Array, Array, Array, Array]:
     """Creates N random states."""
     pos = np.random.uniform(-5, 5, (N, 3))
-    quat = np.random.uniform(
-        -5, 5, (N, 4)
-    )  # all rotation libraries should be normalizing automatically
+    quat = np.random.uniform(-1, 1, (N, 4))  # Libraries normalize automatically
     vel = np.random.uniform(-5, 5, (N, 3))
     ang_vel = np.random.uniform(-2, 2, (N, 3))
-    forces_motor = np.random.uniform(0, 0.15, (N, 4))
-    return pos, quat, vel, ang_vel, forces_motor
+    forces_motor = np.random.uniform(0, 0.2, (N, 4))
+    forces_dist = np.random.uniform(-0.2, 0.2, (N, 3))
+    torques_dist = np.random.uniform(-0.05, 0.05, (N, 3))
+    return pos, quat, vel, ang_vel, forces_motor, forces_dist, torques_dist
 
 
 def create_rnd_commands(N: int = 1000, dim: int = 4) -> Array:
     """Creates N random inputs with size dim."""
-    return np.random.uniform(0, 0.15, (N, dim))
+    return np.random.uniform(0, 0.2, (N, dim))
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("model", available_models)
+@pytest.mark.parametrize("model", available_models.keys())
 @pytest.mark.parametrize("config", Constants.available_configs)
 def test_symbolic2numeric(model: str, config: str):
     """Tests if casadi numeric prediction is the same as the numpy one."""
-    pos, quat, vel, ang_vel, forces_motor = create_rnd_states((N))
+    pos, quat, vel, ang_vel, forces_motor, _, _ = create_rnd_states((N))
     if model == "fitted_DI_rpyt":
         forces_motor = [None] * N
     commands = create_rnd_commands(N, 4)  # TODO make dependent on model
@@ -79,11 +79,11 @@ def test_symbolic2numeric(model: str, config: str):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("model", available_models)
+@pytest.mark.parametrize("model", available_models.keys())
 @pytest.mark.parametrize("config", Constants.available_configs)
 def test_numeric_batching(model: str, config: str):
     """Tests if batching works and if the results are identical to the non-batched version."""
-    pos, quat, vel, ang_vel, forces_motor = create_rnd_states(N)
+    pos, quat, vel, ang_vel, forces_motor, _, _ = create_rnd_states(N)
     commands = create_rnd_commands(N, 4)  # TODO make dependent on model
 
     f_numeric = dynamics_numeric(model, config)
@@ -139,11 +139,11 @@ def test_numeric_batching(model: str, config: str):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("model", available_models)
+@pytest.mark.parametrize("model", available_models.keys())
 @pytest.mark.parametrize("config", Constants.available_configs)
 def test_numeric_arrayAPI(model: str, config: str):
     """Tests is the functions are jitable and if the results are identical to the numpy ones."""
-    nppos, npquat, npvel, npang_vel, npforces_motor = create_rnd_states(N=N)
+    nppos, npquat, npvel, npang_vel, npforces_motor, _, _ = create_rnd_states(N=N)
     if model == "fitted_DI_rpyt":
         npforces_motor = None
     npcommands = create_rnd_commands(N, 4)
