@@ -173,11 +173,9 @@ def f_fitted_DI_rpyt_core(
         vel_dot = vel_dot + forces_dist / constants.MASS
 
     # Rotational equation of motion
-    euler_angles = R.casadi_quat2euler(quat)
-    cs_quat, cs_ang_vel, cs_rpy_rates = R.casadi_ang_vel2rpy_rates()
-    ang_vel2rpy_rates = cs.Function("ang_vel2rpy_rates", [cs_quat, cs_ang_vel], [cs_rpy_rates])
-    cs_quat, cs_rpy_rates, cs_ang_vel = R.casadi_rpy_rates2ang_vel()
-    rpy_rates2ang_vel = cs.Function("rpy_rates2ang_vel", [cs_quat, cs_rpy_rates], [cs_ang_vel])
+    euler_angles = R.cs_quat2euler(quat)
+    ang_vel2rpy_rates = R.create_cs_ang_vel2rpy_rates()
+    rpy_rates2ang_vel = R.create_cs_rpy_rates2ang_vel()
 
     xi = cs.vertcat(cs.horzcat(0, -ang_vel.T), cs.horzcat(ang_vel, -cs.skew(ang_vel)))
     quat_dot = 0.5 * (xi @ quat)

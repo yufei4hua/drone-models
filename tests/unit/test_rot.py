@@ -124,8 +124,7 @@ def test_ang_vel2rpy_rates_symbolic():
     rpy_rates = R.ang_vel2rpy_rates(quats, ang_vels)
 
     # Compare to casadi implementation
-    cs_quat, cs_ang_vel, cs_rpy_rates = R.cs_ang_vel2rpy_rates()
-    cs_ang_vel2rpy_rates = cs.Function("ang_vel2rpy_rates", [cs_quat, cs_ang_vel], [cs_rpy_rates])
+    cs_ang_vel2rpy_rates = R.create_cs_ang_vel2rpy_rates()
     for i in range(len(ang_vels)):
         rpy_rates_cs = np.array(cs_ang_vel2rpy_rates(quats[i], ang_vels[i])).flatten()
         assert np.allclose(rpy_rates_cs, rpy_rates[i]), "Symbolic and numeric results differ."
@@ -141,8 +140,7 @@ def test_rpy_rates2ang_vel_symbolic():
     ang_vels = R.rpy_rates2ang_vel(quats, rpy_rates)
 
     # Compare to casadi implementation
-    cs_quat, cs_rpy_rates, cs_ang_vel = R.cs_rpy_rates2ang_vel()
-    cs_rpy_rates2ang_vel = cs.Function("rpy_rates2ang_vel", [cs_quat, cs_rpy_rates], [cs_ang_vel])
+    cs_rpy_rates2ang_vel = R.create_cs_rpy_rates2ang_vel()
     for i in range(len(rpy_rates)):
         ang_vel_cs = np.array(cs_rpy_rates2ang_vel(quats[i], rpy_rates[i])).flatten()
         assert np.allclose(ang_vel_cs, ang_vels[i]), "Symbolic and numeric results differ."

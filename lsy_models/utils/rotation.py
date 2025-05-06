@@ -299,7 +299,7 @@ def cs_quat2euler(quat: cs.MX, seq: str = "xyz", degrees: bool = False) -> cs.MX
     return angles
 
 
-def cs_ang_vel2rpy_rates() -> tuple[cs.MX, cs.MX, cs.MX]:
+def create_cs_ang_vel2rpy_rates() -> cs.Function:
     """TODO."""
     qw = cs.MX.sym("qw")
     qx = cs.MX.sym("qx")
@@ -320,10 +320,11 @@ def cs_ang_vel2rpy_rates() -> tuple[cs.MX, cs.MX, cs.MX]:
 
     conv_mat = cs.vertcat(row1, row2, row3)
     rpy_rates = conv_mat @ ang_vel
-    return quat, ang_vel, rpy_rates
+
+    return cs.Function("cs_ang_vel2rpy_rates", [quat, ang_vel], [rpy_rates])
 
 
-def cs_rpy_rates2ang_vel() -> tuple[cs.MX, cs.MX, cs.MX]:
+def create_cs_rpy_rates2ang_vel() -> tuple[cs.MX, cs.MX, cs.MX]:
     """TODO."""
     qw = cs.MX.sym("qw")
     qx = cs.MX.sym("qx")
@@ -344,7 +345,7 @@ def cs_rpy_rates2ang_vel() -> tuple[cs.MX, cs.MX, cs.MX]:
 
     conv_mat = cs.vertcat(row1, row2, row3)
     ang_vel = conv_mat @ rpy_rates
-    return quat, rpy_rates, ang_vel
+    return cs.Function("cs_rpy_rates2ang_vel", [quat, rpy_rates], [ang_vel])
 
 
 # def cs_ang_vel_deriv2rpy_rates_deriv() -> tuple[cs.MX, cs.MX, cs.MX]:
