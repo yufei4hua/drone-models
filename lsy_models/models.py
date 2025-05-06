@@ -24,14 +24,14 @@ if TYPE_CHECKING:
 
     Array = NDArray | JaxArray | Tensor
 
-# used in testing
-available_models = [
-    "first_principles",
-    "fitted_DI_rpyt",
-    "fitted_DI_D_rpyt",
-]  #  # "mellinger_rpyt",
-# available_models = ({"name": "first_principles", "continuous": True},
-#                     ...) # TODO
+# Used in testing
+available_models = {
+    # "model_name": [motor_dynamics, forces_dist, torques_dist],
+    "first_principles": [True, True, True],
+    "fitted_DI_rpyt": [False, True, True],
+    "fitted_DI_D_rpyt": [True, True, True],
+}
+#  TODO "mellinger_rpyt",
 
 
 def dynamics_numeric(
