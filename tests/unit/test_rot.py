@@ -238,3 +238,6 @@ def test_rpy_rates_deriv2ang_vel_deriv_symbolic():
         assert np.allclose(ang_vels_deriv_cs, ang_vels_deriv[i]), (
             "Symbolic and numeric results differ."
         )
+
+
+# TODO test ang_vel2rpy_rates (and deriv) conversions with jp and np arrays
