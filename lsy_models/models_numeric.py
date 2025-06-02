@@ -205,7 +205,7 @@ def f_fitted_DI_rpyt_core(
         forces_sum = xp.sum(forces_motor, axis=-1)
         thrust = constants.DI_D_ACC[0] + constants.DI_D_ACC[1] * forces_sum
 
-    drone_z_axis = rot.inv().as_matrix()[..., -1, :]
+    drone_z_axis = rot.as_matrix()[..., -1]
 
     pos_dot = vel
     vel_dot = 1.0 / constants.MASS * thrust[..., None] * drone_z_axis + constants.GRAVITY_VEC
