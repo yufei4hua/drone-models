@@ -8,10 +8,11 @@ from array_api_compat import array_namespace
 
 import drone_models.utils.cf2 as cf2
 import drone_models.utils.rotation as R
+from drone_models.transform import force2pwm, motor_force2rotor_speed, pwm2force
 from drone_models.utils.constants_controllers import cntrl_const_mel
 
 if TYPE_CHECKING:
-    from array_api_compat.typing import Array
+    from array_api_typing import Array
 
     from drone_models.utils.constants import Constants
 
@@ -142,12 +143,10 @@ def attitude2force_torque(
         4 Motor forces [N], i_error_m
     """
     xp = array_namespace(pos)
-    force_des = cf2.force2pwm(command_rpyt[..., -1], constants, perMotor=False)
+    force_des = command_rpyt[..., -1]  # Total thrust in N
     rpy_des = command_rpyt[..., :-1]
     axis_flip = xp.array([1, -1, 1])  # to change the direction of the y axis
-    # From firmware controller_mellinger
-    # l. 220 ff [eR]
-    # Using the "inefficient" code from the firmware
+    # l. 220 ff [eR]. We're using the "inefficient" code path from the firmware
     rot = R.from_quat(quat)
     rot_des = R.from_euler("xyz", rpy_des, degrees=False)
     R_act = rot.as_matrix()
@@ -177,31 +176,21 @@ def attitude2force_torque(
     i_error_m = i_error_m - eR * dt
     i_error_m = xp.clip(i_error_m, -cntrl_const_mel["i_range_m"], cntrl_const_mel["i_range_m"])
     # l. 278 ff Moment:
-    torque_des = (
+    torque_pwm = (
         -cntrl_const_mel["kR"] * eR
         + cntrl_const_mel["kw"] * ew
         + cntrl_const_mel["ki_m"] * i_error_m
         + cntrl_const_mel["kd_omega"] * err_d
     )
     # l. 297 ff
-    torque_des = xp.clip(torque_des, -cntrl_const_mel["torque_max"], cntrl_const_mel["torque_max"])
-    torque_des = xp.where((force_des > 0)[..., None], torque_des, 0.0)
-
-    control = {
-        "thrust": force_des,
-        "roll": torque_des[..., 0],
-        "pitch": torque_des[..., 1],
-        "yaw": -torque_des[..., 2],
-    }
-    # INFO:
-    # The following part is NOT part of the Mellinger controller itself,
-    # but of the firmware. It is how the firmware calculates the motor forces
-    # onboard. Actually, the output of this part are motor PWM values.
-    # However, with the knowledge of the system, we can directly calculate the
-    # corresponding force "commands", which need to pass through the motor dynamics.
-    pwms = power_distribution_legacy(control, force_des)
-    pwms = power_distribution_clip(pwms, constants)
-    forces = cf2.pwm2force(pwms, constants, perMotor=True)
+    torque_pwm = xp.clip(torque_pwm, -32_000, 32_000)
+    torque_pwm = xp.where((force_des > 0)[..., None], torque_pwm, 0.0)
+    # Info: The following part is NOT part of the Mellinger controller, but of the firmware.
+    # The mixing of force and torque is done on the PWM level. We therefore mix those here according
+    # to the legacy behavior of the firmware, and then calculate the resulting SI forces and torques
+    force_des_pwm = force2pwm(force_des / 4, constants.THRUST_MAX, constants.PWM_MAX)
+    pwms = pwm_clip(force_torque_pwms2pwms(force_des_pwm, torque_pwm), constants)
+    motor_forces = pwm2force(pwms, constants.THRUST_MAX, constants.PWM_MAX)
     # TODO: Long-term, the Mellinger controller should use the new power distribution which
     # calculates motor forces in Newtons. However, for now the firmware uses the legacy power
     # distribution, so we keep it here for compatibility. To have a single consistent interface for
@@ -209,43 +198,31 @@ def attitude2force_torque(
     # to convert the legacy output to SI units.
     # l. 310 ff
     torque_des = (
-        forces
+        motor_forces
         @ constants.SIGN_MATRIX
         * xp.stack([constants.L, constants.L, constants.KM / constants.KF])
     )
-    force_des = xp.sum(forces, axis=-1)
+    force_des = xp.sum(motor_forces, axis=-1)
     return force_des, torque_des, i_error_m
 
 
-def force_torque2rotor_speed_legacy():
+def force_torque_pwms2pwms(force_pwm: Array, torque_pwm: Array) -> Array:
     """Convert desired collective thrust and torques to rotor speeds using legacy behavior."""
-    ...
-
-
-def power_distribution_legacy(torque: Array, thrust: Array) -> Array:
-    """Legacy power distribution from power_distribution_quadrotor.c working with PWM signals.
-
-    Args:
-        control: dictionary of the same form as the control type in the firmware
-
-    Returns:
-        Array of the four commanded motor PWMs
-    """
-    xp = array_namespace(torque)
-    m1_pwm = thrust - torque[..., 0] + torque[..., 1] + torque[..., 2]
-    m2_pwm = thrust - torque[..., 0] - torque[..., 1] - torque[..., 2]
-    m3_pwm = thrust + torque[..., 0] - torque[..., 1] + torque[..., 2]
-    m4_pwm = thrust + torque[..., 0] + torque[..., 1] - torque[..., 2]
+    xp = array_namespace(force_pwm)
+    # Note: The sign flip is responsible for the double
+    m1_pwm = force_pwm - torque_pwm[..., 0] + torque_pwm[..., 1] + torque_pwm[..., 2]
+    m2_pwm = force_pwm - torque_pwm[..., 0] - torque_pwm[..., 1] - torque_pwm[..., 2]
+    m3_pwm = force_pwm + torque_pwm[..., 0] - torque_pwm[..., 1] + torque_pwm[..., 2]
+    m4_pwm = force_pwm + torque_pwm[..., 0] + torque_pwm[..., 1] - torque_pwm[..., 2]
     return xp.stack((m1_pwm, m2_pwm, m3_pwm, m4_pwm), axis=-1)
 
 
-def force_torque2rotor_speed(force: Array, torque: Array, constants: Constants) -> Array:
+def force_torque2motor_force(force: Array, torque: Array, constants: Constants) -> Array:
     """Convert desired collective thrust and torques to rotor speeds.
 
     The firmware calculates PWMs for each motor, compensates for the battery voltage, and then
     applies the modified PWMs to the motors. We assume perfect battery compensation here, skip the
-    PWM interface except for clipping, and instead return rotor speeds. This allows us to account
-    for rotor dynamics.
+    PWM interface except for clipping, and instead return desired motor forces.
 
     Note:
         The equivalent function in the crazyflie firmware is power_distribution from
@@ -260,7 +237,7 @@ def force_torque2rotor_speed(force: Array, torque: Array, constants: Constants) 
         constants: constants for the drone
 
     Returns:
-        Array of the four commanded motor PWMs
+        The desired motor forces in SI units with shape (..., 4).
     """
     xp = array_namespace(torque)
     roll_part = 0.25 / constants.L * torque[..., 0]
@@ -274,26 +251,12 @@ def force_torque2rotor_speed(force: Array, torque: Array, constants: Constants) 
     motor_forces = xp.stack((m1_force, m2_force, m3_force, m4_force), axis=-1)
     # Clip motor forces on the thrust instead of PWM level.
     clipped_forces = xp.clip(motor_forces, constants.THRUST_MIN, constants.THRUST_MAX)
-    motor_forces = xp.where(xp.all(motor_forces == 0), 0.0, clipped_forces)
+    return xp.where(xp.all(motor_forces == 0), 0.0, clipped_forces)
     # Assume perfect battery compensation and calculate the desired motor speeds directly
     return motor_force2rotor_speed(motor_forces, constants)
 
 
-def motor_force2rotor_speed(motor_forces: Array, constants: Constants) -> Array:
-    """Convert motor forces to rotor speeds.
-
-    Args:
-        motor_forces: Motor forces in SI units with shape (..., 4).
-        constants: Constants of the specific drone.
-
-    Returns:
-        Array of rotor speeds in rad/s with shape (..., 4).
-    """
-    xp = array_namespace(motor_forces)
-    return xp.sqrt(motor_forces / constants.KF)
-
-
-def power_distribution_clip(motor_pwm: Array, constants: Constants) -> Constants:
+def pwm_clip(motor_pwm: Array, constants: Constants) -> Constants:
     """TODO."""
     xp = array_namespace(motor_pwm)
     return xp.where(
