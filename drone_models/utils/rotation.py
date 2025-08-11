@@ -6,7 +6,6 @@ https://github.com/jax-ml/jax/blob/main/jax/_src/scipy/spatial/transform.py
 
 from __future__ import annotations
 
-import importlib
 import os
 
 os.environ["SCIPY_ARRAY_API"] = "1"  # Feature flag to activate Array API in scipy
@@ -14,16 +13,10 @@ import re
 from typing import TYPE_CHECKING
 
 import casadi as cs
-import jax.numpy as jp
-import scipy
 from scipy.spatial.transform import Rotation as R
 
 if TYPE_CHECKING:
-    from jax import Array as JaxArray
-    from numpy.typing import NDArray
-    from torch import Tensor
-
-    Array = NDArray | JaxArray | Tensor
+    from array_api_strict import Array
 
 # Activating Array API in scipy and force reloading the package
 # os.environ["SCIPY_ARRAY_API"] = "1"

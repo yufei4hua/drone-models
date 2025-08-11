@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Type
 
-import numpy as np
-
 if TYPE_CHECKING:
     from array_api_compat.typing import Array
 

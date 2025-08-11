@@ -4,18 +4,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import jax.numpy as jp
-import numpy as np
+import array_api_compat.numpy as np
+import array_api_strict as xp
 import pytest
 
 import drone_models.utils.rotation as R
 
 if TYPE_CHECKING:
-    from jax import Array as JaxArray
-    from numpy.typing import NDArray
-    from torch import Tensor
-
-    Array = NDArray | JaxArray | Tensor
+    from array_api_strict import Array
 
 tol = 1e-6  # Since Jax by default works with 32 bit, the precision is worse
 
@@ -71,8 +67,8 @@ def test_rot_from_euler():
 @pytest.mark.unit
 def test_ang_vel2rpy_rates_two_way():
     """TODO."""
-    quats = np.array(create_uniform_quats())
-    ang_vels = np.array(create_uniform_ang_vel())
+    quats = xp.asarray(create_uniform_quats())
+    ang_vels = xp.asarray(create_uniform_ang_vel())
 
     rpy_rates_two_way = R.ang_vel2rpy_rates(quats, ang_vels)
     ang_vels_two_way = R.rpy_rates2ang_vel(quats, rpy_rates_two_way)
@@ -82,16 +78,16 @@ def test_ang_vel2rpy_rates_two_way():
 @pytest.mark.unit
 def test_ang_vel2rpy_rates_batching():
     """TODO."""
-    quats = np.array(create_uniform_quats())
-    ang_vels = np.array(create_uniform_ang_vel())
+    quats = xp.asarray(create_uniform_quats())
+    ang_vels = xp.asarray(create_uniform_ang_vel())
 
     # Calculate batched version
     rpy_rates_batched = R.ang_vel2rpy_rates(quats, ang_vels)
 
     # Compare to non-batched version
-    for i in range(len(ang_vels)):
-        rpy_rates_non_batched = R.ang_vel2rpy_rates(quats[i], ang_vels[i])
-        assert np.allclose(rpy_rates_non_batched, rpy_rates_batched[i]), (
+    for i in range(ang_vels.shape[0]):
+        rpy_rates_non_batched = R.ang_vel2rpy_rates(quats[i, ...], ang_vels[i, ...])
+        assert np.allclose(rpy_rates_non_batched, rpy_rates_batched[i, ...]), (
             "Batched and non-batched results differ."
         )
 
@@ -99,16 +95,16 @@ def test_ang_vel2rpy_rates_batching():
 @pytest.mark.unit
 def test_rpy_rates2ang_vel_batching():
     """TODO."""
-    quats = np.array(create_uniform_quats())
-    rpy_rates = np.array(create_uniform_ang_vel())
+    quats = xp.asarray(create_uniform_quats())
+    rpy_rates = xp.asarray(create_uniform_ang_vel())
 
     # Calculate batched version
     ang_vel_batched = R.rpy_rates2ang_vel(quats, rpy_rates)
 
     # Compare to non-batched version
-    for i in range(len(rpy_rates)):
-        ang_vel_non_batched = R.rpy_rates2ang_vel(quats[i], rpy_rates[i])
-        assert np.allclose(ang_vel_non_batched, ang_vel_batched[i]), (
+    for i in range(rpy_rates.shape[0]):
+        ang_vel_non_batched = R.rpy_rates2ang_vel(quats[i, ...], rpy_rates[i, ...])
+        assert np.allclose(ang_vel_non_batched, ang_vel_batched[i, ...]), (
             "Batched and non-batched results differ."
         )
 
@@ -146,9 +142,9 @@ def test_rpy_rates2ang_vel_symbolic():
 @pytest.mark.unit
 def test_ang_vel_deriv2rpy_rates_deriv_two_way():
     """TODO."""
-    quats = np.array(create_uniform_quats())
-    ang_vels = np.array(create_uniform_ang_vel())
-    ang_vels_deriv = np.array(create_uniform_ang_vel())
+    quats = xp.asarray(create_uniform_quats())
+    ang_vels = xp.asarray(create_uniform_ang_vel())
+    ang_vels_deriv = xp.asarray(create_uniform_ang_vel())
     rpy_rates = R.ang_vel2rpy_rates(quats, ang_vels)
 
     rpy_rates_deriv_two_way = R.ang_vel_deriv2rpy_rates_deriv(quats, ang_vels, ang_vels_deriv)
@@ -161,19 +157,19 @@ def test_ang_vel_deriv2rpy_rates_deriv_two_way():
 @pytest.mark.unit
 def test_ang_vel_deriv2rpy_rates_deriv_batching():
     """TODO."""
-    quats = np.array(create_uniform_quats())
-    ang_vels = np.array(create_uniform_ang_vel())
-    ang_vels_deriv = np.array(create_uniform_ang_vel())
+    quats = xp.asarray(create_uniform_quats())
+    ang_vels = xp.asarray(create_uniform_ang_vel())
+    ang_vels_deriv = xp.asarray(create_uniform_ang_vel())
 
     # Calculate batched version
     rpy_rates_deriv_batched = R.ang_vel_deriv2rpy_rates_deriv(quats, ang_vels, ang_vels_deriv)
 
     # Compare to non-batched version
-    for i in range(len(ang_vels)):
+    for i in range(ang_vels.shape[0]):
         rpy_rates_deriv_non_batched = R.ang_vel_deriv2rpy_rates_deriv(
-            quats[i], ang_vels[i], ang_vels_deriv[i]
+            quats[i, ...], ang_vels[i, ...], ang_vels_deriv[i, ...]
         )
-        assert np.allclose(rpy_rates_deriv_non_batched, rpy_rates_deriv_batched[i]), (
+        assert np.allclose(rpy_rates_deriv_non_batched, rpy_rates_deriv_batched[i, ...]), (
             "Batched and non-batched results differ."
         )
 
@@ -189,11 +185,11 @@ def test_rpy_rates_deriv2ang_vel_deriv_batching():
     ang_vels_deriv_batched = R.rpy_rates_deriv2ang_vel_deriv(quats, rpy_rates, rpy_rates_deriv)
 
     # Compare to non-batched version
-    for i in range(len(rpy_rates)):
+    for i in range(rpy_rates.shape[0]):
         ang_vels_deriv_non_batched = R.rpy_rates_deriv2ang_vel_deriv(
-            quats[i], rpy_rates[i], rpy_rates_deriv[i]
+            quats[i, ...], rpy_rates[i, ...], rpy_rates_deriv[i, ...]
         )
-        assert np.allclose(ang_vels_deriv_non_batched, ang_vels_deriv_batched[i]), (
+        assert np.allclose(ang_vels_deriv_non_batched, ang_vels_deriv_batched[i, ...]), (
             "Batched and non-batched results differ."
         )
 
@@ -209,7 +205,7 @@ def test_ang_vel_deriv2rpy_rates_deriv_symbolic():
     rpy_rates_deriv = R.ang_vel_deriv2rpy_rates_deriv(quats, ang_vels, ang_vels_deriv)
 
     # Compare to casadi implementation
-    for i in range(len(ang_vels)):
+    for i in range(ang_vels.shape[0]):
         # TODO test against casadi implementation
         rpy_rates_deriv_cs = np.array(
             R.cs_ang_vel_deriv2rpy_rates_deriv(quats[i], ang_vels[i], ang_vels_deriv[i])
