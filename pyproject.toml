@@ -1,7 +1,7 @@
 [project]
-name = "lsy_models"
+name = "drone_models"
 version = "0.0.1"
-description = "TODO"
+description = "Models of quadrotor drones for estimation and control tasks."
 readme = "README.md"
 license = { file = "LICENSE" }
 classifiers = [
@@ -13,16 +13,25 @@ classifiers = [
     "Intended Audience :: Science/Research",
 ]
 
-dependencies = ["jax", "casadi", "numpy"]
+dependencies = ["numpy>=2.0.0", "array-api-compat"]
 
 [project.optional-dependencies]
-test = ["pytest>=8.0.0", "pytest-cov", "pytest-timeout"]
+test = [
+    "pytest>=8.0.0",
+    "pytest-cov",
+    "pytest-timeout",
+    "jax",
+    "torch",
+    "casadi",
+    "array-api-compat",
+    "array-api-strict",
+]
 
 [tool.setuptools.packages]
 find = {}
 
 [tool.setuptools.package-data]
-lsy_models = ["data/*.xml"]
+drone_models = ["data/*.xml"]
 
 [tool.pytest.ini_options]
 markers = ["unit", "integration", "render"]

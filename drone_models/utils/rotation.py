@@ -6,12 +6,16 @@ https://github.com/jax-ml/jax/blob/main/jax/_src/scipy/spatial/transform.py
 
 from __future__ import annotations
 
+import importlib
+import os
+
+os.environ["SCIPY_ARRAY_API"] = "1"  # Feature flag to activate Array API in scipy
 import re
 from typing import TYPE_CHECKING
 
 import casadi as cs
 import jax.numpy as jp
-from jax.scipy.spatial.transform import Rotation as JR
+import scipy
 from scipy.spatial.transform import Rotation as R
 
 if TYPE_CHECKING:
@@ -21,39 +25,20 @@ if TYPE_CHECKING:
 
     Array = NDArray | JaxArray | Tensor
 
-
-def from_quat(quat: Array, scalar_first: bool = False) -> R:
-    """Creates a rotation object compatible with the type of the given quat."""
-    if isinstance(quat, jp.ndarray):
-        if scalar_first:
-            raise ValueError("scalar_first is not supported by jax rotations")
-        return JR.from_quat(quat)
-    else:
-        return R.from_quat(quat, scalar_first=scalar_first)
+# Activating Array API in scipy and force reloading the package
+# os.environ["SCIPY_ARRAY_API"] = "1"
+# importlib.reload(scipy.spatial.transform)
 
 
-def from_rotvec(rotvec: Array, degrees: bool = False) -> R:
-    """Creates a rotation object compatible with the type of the given rotvec."""
-    if isinstance(rotvec, jp.ndarray):
-        return JR.from_rotvec(rotvec, degrees)
-    else:
-        return R.from_rotvec(rotvec, degrees)
-
-
-def from_euler(seq: str, angles: Array, degrees: bool = False) -> R:
-    """Creates a rotation object compatible with the type of the given angles."""
-    if isinstance(angles, jp.ndarray):
-        return JR.from_euler(seq, angles, degrees)
-    else:
-        return R.from_euler(seq, angles, degrees)
-
-
-def from_matrix(matrix: Array) -> R:
-    """Creates a rotation objecte compatible with the type of the given rotation matrix."""
-    if isinstance(matrix, jp.ndarray):
-        return JR.from_matrix(matrix)
-    else:
-        return R.from_matrix(matrix)
+def cross(a: Array, b: Array) -> Array:
+    """TODO. Also test this function agains numpy cross."""
+    xp = a.__array_namespace__()
+    ax, ay, az = a[..., 0:1], a[..., 1:2], a[..., 2:3]
+    bx, by, bz = b[..., 0:1], b[..., 1:2], b[..., 2:3]
+    cx = ay * bz - az * by
+    cy = az * bx - ax * bz
+    cz = ax * by - ay * bx
+    return xp.concat((cx, cy, cz), axis=-1)
 
 
 def quat_mult(q1: Array, q2: Array) -> Array:
@@ -82,7 +67,9 @@ def quat_conj(q: Array) -> Array:
 def ang_vel2rpy_rates(quat: Array, ang_vel: Array) -> Array:
     """Convert angular velocity to rpy rates with batch support."""
     xp = quat.__array_namespace__()
-    rpy = from_quat(quat).as_euler("xyz")
+    print(type(quat))
+    rpy = R.from_quat(quat).as_euler("xyz")
+    print(type(rpy))
     phi, theta = rpy[..., 0], rpy[..., 1]
 
     sin_phi = xp.sin(phi)
@@ -109,7 +96,7 @@ def ang_vel2rpy_rates(quat: Array, ang_vel: Array) -> Array:
 def rpy_rates2ang_vel(quat: Array, rpy_rates: Array) -> Array:
     """Convert rpy rates to angular velocity with batch support."""
     xp = quat.__array_namespace__()
-    rpy = from_quat(quat).as_euler("xyz")
+    rpy = R.from_quat(quat).as_euler("xyz")
     phi, theta = rpy[..., 0], rpy[..., 1]
 
     sin_phi = xp.sin(phi)
@@ -139,7 +126,7 @@ def ang_vel_deriv2rpy_rates_deriv(quat: Array, ang_vel: Array, ang_vel_deriv: Ar
         \dot{\psi} = \mathbf{\dot{W}}\mathbf{\omega} + \mathbf{W} \dot{\mathbf{\omega}}
     """
     xp = quat.__array_namespace__()
-    rpy = from_quat(quat).as_euler("xyz")
+    rpy = R.from_quat(quat).as_euler("xyz")
     phi, theta = rpy[..., 0], rpy[..., 1]
     rpy_rates = ang_vel2rpy_rates(quat, ang_vel)
     phi_dot, theta_dot = rpy_rates[..., 0], rpy_rates[..., 1]
@@ -184,7 +171,7 @@ def rpy_rates_deriv2ang_vel_deriv(quat: Array, rpy_rates: Array, rpy_rates_deriv
         \dot{\omega} = \mathbf{\dot{W}}\dot{\mathbf{\psi}} + \mathbf{W} \ddot{\mathbf{\psi}}
     """
     xp = quat.__array_namespace__()
-    rpy = from_quat(quat).as_euler("xyz")
+    rpy = R.from_quat(quat).as_euler("xyz")
     phi, theta = rpy[..., 0], rpy[..., 1]
     phi_dot, theta_dot = rpy_rates[..., 0], rpy_rates[..., 1]
 
@@ -255,7 +242,7 @@ def cs_quat2euler(quat: cs.MX, seq: str = "xyz", degrees: bool = False) -> cs.MX
             return 0
         elif axis == "y":
             return 1
-        elif axis == "z":
+        else:
             return 2
 
     i = elementary_basis_index(seq[0])

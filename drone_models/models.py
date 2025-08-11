@@ -3,26 +3,22 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Type
 
 import casadi as cs
 import numpy as np
 
-from lsy_models import (
+from drone_models import (
     controllers_numeric,
     models_numeric,  # TODO would be nice to directly import all the functions -> currently they are called the same though
     models_symbolic,
 )
-from lsy_models.utils.constants import Constants
+from drone_models.utils.constants import Constants
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from jax import Array as JaxArray
-    from numpy.typing import NDArray
-    from torch import Tensor
-
-    Array = NDArray | JaxArray | Tensor
+    from array_api_compat.typing import Array
 
 # Used in testing
 available_models = {
@@ -30,12 +26,13 @@ available_models = {
     "first_principles": [True, True, True],
     "fitted_DI_rpyt": [False, True, True],
     "fitted_DI_D_rpyt": [True, True, True],
+    # "fitted_DI_DD_rpyt": [True, True, True],
 }
 #  TODO "mellinger_rpyt",
 
 
 def dynamics_numeric(
-    model: str, config: str
+    model: str, config: str, xp: Type[Array]
 ) -> Callable[
     [Array, Array, Array, Array, Array, Array, Array | None, Array | None],
     tuple[Array, Array, Array, Array, Array | None],
@@ -45,6 +42,7 @@ def dynamics_numeric(
     Args:
         model: The chosen dynamical model. See available_models
         config: The chosen config/constants for the model. See Constants.available_configs
+        xp: The array API to use (e.g. numpy, jax, cupy, ...).
 
     Returns:
         A callable which takes the states and input and returns the derivative of the state.
@@ -54,7 +52,7 @@ def dynamics_numeric(
         If you still decide to use quat_dot to integrate, ensure unit length!
         More information https://ahrs.readthedocs.io/en/latest/filters/angular.html
     """
-    constants = Constants.from_config(config)
+    constants = Constants.from_config(config, xp)
 
     match model:
         case "first_principles":
@@ -105,10 +103,8 @@ def dynamics_numeric(
 
 def dynamic_numeric_from_symbolic(
     model: str, config: str
-) -> Callable[
-    [Array, Array, Array, Array, Array, Array, Array | None, Array | None],
-    tuple[Array, Array, Array, Array, Array | None],
-]:
+) -> Callable[[Array, Array], tuple[Array, Array, Array, Array, Array | None]]:
+    # , Array, Array, Array, Array, Array | None, Array | None
     """Creates a numerical dynamics function f(x,u) from a CasADi model.
 
     Args:
@@ -118,7 +114,7 @@ def dynamic_numeric_from_symbolic(
     Returns:
         A callable which takes the states and input and returns the derivative of the state.
     """
-    constants = Constants.from_config(config)
+    constants = Constants.from_config(config, np)
 
     match model:
         case "first_principles":

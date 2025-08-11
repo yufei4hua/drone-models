@@ -8,7 +8,7 @@ import jax.numpy as jp
 import numpy as np
 import pytest
 
-import lsy_models.utils.rotation as R
+import drone_models.utils.rotation as R
 
 if TYPE_CHECKING:
     from jax import Array as JaxArray
@@ -46,20 +46,20 @@ def create_uniform_ang_vel(N: int = 1000, scale: float = 10) -> list:
     return ang_vel.tolist()
 
 
-@pytest.mark.unit
-def test_rot_from_quat():
-    """Testing Quaternion to Euler angle with individual arrays."""
-    quats = create_uniform_quats()
-    quats.extend(create_lock_quats())
+# @pytest.mark.unit
+# def test_rot_from_quat():
+#     """Testing Quaternion to Euler angle with individual arrays."""
+#     quats = create_uniform_quats()
+#     quats.extend(create_lock_quats())
 
-    # Testing individual
-    for q in quats:
-        R.from_quat(np.array(q))
-        R.from_quat(jp.array(q))
+#     # Testing individual
+#     for q in quats:
+#         R.from_quat(np.array(q))
+#         R.from_quat(jp.array(q))
 
-    # Testing batched
-    R.from_quat(np.array(quats))
-    R.from_quat(jp.array(quats))
+#     # Testing batched
+#     R.from_quat(np.array(quats))
+#     R.from_quat(jp.array(quats))
 
 
 @pytest.mark.unit

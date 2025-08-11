@@ -17,9 +17,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import lsy_models.utils.cf2 as cf2
-import lsy_models.utils.rotation as R
-from lsy_models.utils.constants_controllers import cntrl_const_mel
+import drone_models.utils.cf2 as cf2
+import drone_models.utils.rotation as R
+from drone_models.utils.constants_controllers import cntrl_const_mel
 
 if TYPE_CHECKING:
     from jax import Array as JaxArray
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
     Array = NDArray | JaxArray | Tensor
 
-    from lsy_models.utils.constants import Constants
+    from drone_models.utils.constants import Constants
 
 
 def cntrl_mellinger_position(

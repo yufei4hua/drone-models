@@ -6,8 +6,8 @@ https://github.com/middleyuan/safe-control-gym/blob/d5f4f4f1cea112cab84031453b28
 
 import casadi as cs
 
-import lsy_models.utils.rotation as R
-from lsy_models.utils.constants import Constants
+import drone_models.utils.rotation as R
+from drone_models.utils.constants import Constants
 
 # States
 px, py, pz = cs.MX.sym("px"), cs.MX.sym("py"), cs.MX.sym("pz")
@@ -34,11 +34,7 @@ cmd_f1, cmd_f2, cmd_f3, cmd_f4 = (
     cs.MX.sym("cmd_f4"),
 )
 cmd_force = cs.vertcat(cmd_f1, cmd_f2, cmd_f3, cmd_f4)
-cmd_roll, cmd_pitch, cmd_yaw = (
-    cs.MX.sym("cmd_roll"),
-    cs.MX.sym("cmd_pitch"),
-    cs.MX.sym("cmd_yaw"),
-)
+cmd_roll, cmd_pitch, cmd_yaw = (cs.MX.sym("cmd_roll"), cs.MX.sym("cmd_pitch"), cs.MX.sym("cmd_yaw"))
 cmd_thrust = cs.MX.sym("cmd_thrust")
 cmd_rpyt = cs.vertcat(cmd_roll, cmd_pitch, cmd_yaw, cmd_thrust)
 
@@ -90,9 +86,7 @@ def first_principles(
     # Rotational equation of motion
     xi = cs.vertcat(cs.horzcat(0, -ang_vel.T), cs.horzcat(ang_vel, -cs.skew(ang_vel)))
     quat_dot = 0.5 * (xi @ quat)
-    ang_vel_dot = constants.J_INV @ (
-        torques_motor_vec - cs.cross(ang_vel, constants.J @ ang_vel)
-    )
+    ang_vel_dot = constants.J_INV @ (torques_motor_vec - cs.cross(ang_vel, constants.J @ ang_vel))
     if calc_torques_dist:
         # adding torque disturbances to the state
         # angular acceleration can be converted to total torque
@@ -149,15 +143,11 @@ def f_fitted_DI_rpyt_core(
         forces_motor_dot = 1 / constants.DI_D_ACC[2] * (cmd_thrust / 4 - forces_motor)
         thrust = cs.sum1(forces_motor)
         # Creating force vector
-        forces_motor_vec = cs.vertcat(
-            0, 0, constants.DI_D_ACC[0] + constants.DI_D_ACC[1] * thrust
-        )
+        forces_motor_vec = cs.vertcat(0, 0, constants.DI_D_ACC[0] + constants.DI_D_ACC[1] * thrust)
     else:
         thrust = cmd_thrust
         # Creating force vector
-        forces_motor_vec = cs.vertcat(
-            0, 0, constants.DI_ACC[0] + constants.DI_ACC[1] * thrust
-        )
+        forces_motor_vec = cs.vertcat(0, 0, constants.DI_ACC[0] + constants.DI_ACC[1] * thrust)
 
     # Linear equation of motion
     pos_dot = vel

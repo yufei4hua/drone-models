@@ -5,16 +5,14 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import lsy_models.utils.rotation as R
+from scipy.spatial.transform import Rotation as R
+
+from drone_models.utils import rotation
 
 if TYPE_CHECKING:
-    from jax import Array as JaxArray
-    from numpy.typing import NDArray
-    from torch import Tensor
+    from array_api_compat.typing import Array
 
-    Array = NDArray | JaxArray | Tensor
-
-    from lsy_models.utils.constants import Constants
+    from drone_models.utils.constants import Constants
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -23,7 +21,13 @@ logger = logging.getLogger(__name__)
 def quat_dot_from_ang_vel(quat: Array, ang_vel: Array) -> Array:
     """Calculates the quaternion derivative based on an angular velocity."""
     xp = quat.__array_namespace__()
-    x, y, z = xp.split(ang_vel, 3, axis=-1)
+
+    # Split angular velocity
+    x = ang_vel[..., 0:1]
+    y = ang_vel[..., 1:2]
+    z = ang_vel[..., 2:3]
+
+    # Skew-symmetric matrix
     ang_vel_skew = xp.stack(
         [
             xp.concat((xp.zeros_like(x), -z, y), axis=-1),
@@ -32,11 +36,22 @@ def quat_dot_from_ang_vel(quat: Array, ang_vel: Array) -> Array:
         ],
         axis=-2,
     )
-    xi1 = xp.insert(-ang_vel, 0, 0, axis=-1)  # First line of xi
-    xi2 = xp.concat((xp.expand_dims(ang_vel.T, axis=0).T, -ang_vel_skew), axis=-1)
-    xi = xp.concat((xp.expand_dims(xi1, axis=-2), xi2), axis=-2)
-    return 0.5 * xp.matvec(xi, quat)
-    # return 0.5 * (xi @ quat[..., None]).squeeze(axis=-1)
+
+    # First row of Xi
+    xi1 = xp.concat((xp.zeros_like(x), -ang_vel), axis=-1)
+
+    # Second to fourth rows of Xi
+    ang_vel_col = xp.expand_dims(ang_vel, axis=-1)  # (..., 3, 1)
+    xi2 = xp.concat((ang_vel_col, -ang_vel_skew), axis=-1)  # (..., 3, 4)
+
+    # Combine into Xi
+    xi1_exp = xp.expand_dims(xi1, axis=-2)  # (..., 1, 4)
+    xi = xp.concat((xi1_exp, xi2), axis=-2)  # (..., 4, 4)
+
+    # Quaternion derivative
+    quat_exp = xp.expand_dims(quat, axis=-1)  # (..., 4, 1)
+    result = 0.5 * xp.matmul(xi, quat_exp)  # (..., 4, 1)
+    return xp.squeeze(result, axis=-1)  # (..., 4)
 
 
 def f_first_principles(
@@ -72,7 +87,7 @@ def f_first_principles(
         forces_motor_dot = None
         forces_motor = command
     else:
-        forces_motor_dot = constants.THRUST_TAU * (command - forces_motor)  # TODO 1/TAU
+        forces_motor_dot = xp.asarray(constants.THRUST_TAU * (command - forces_motor))  # TODO 1/TAU
     # Creating force and torque vector
     forces_motor_tot = xp.sum(forces_motor, axis=-1)
     # forces_motor_tot = xp.sum(
@@ -84,7 +99,7 @@ def f_first_principles(
     # Because there currently is no way to identify the z torque in relation to the thrust,
     # we rely on a old identified value that can compute rpm to torque.
     # force = kf * rpm², torque = km * rpm² => torque = km/kf*force
-    torques_motor_vec = xp.vecmat(forces_motor, constants.SIGN_MATRIX) * xp.array(
+    torques_motor_vec = xp.matmul(forces_motor, constants.SIGN_MATRIX) * xp.stack(
         [constants.L, constants.L, constants.KM / constants.KF]
     )
 
@@ -105,8 +120,9 @@ def f_first_principles(
         # paper: rot.as_matrix() @ torques_dist
         torques = torques + rot.apply(torques_dist)
     quat_dot = quat_dot_from_ang_vel(quat, ang_vel)
-    ang_vel_dot = xp.matvec(
-        constants.J_INV, torques - xp.cross(ang_vel, xp.matvec(constants.J, ang_vel))
+    ang_vel_dot = xp.matmul(
+        torques - rotation.cross(ang_vel, xp.matmul(ang_vel, xp.asarray(constants.J).T)),
+        xp.asarray(constants.J_INV).T,
     )
 
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot
@@ -192,7 +208,7 @@ def f_fitted_DI_rpyt_core(
     cmd_rpy = command[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
-    rpy_rates = R.ang_vel2rpy_rates(quat, ang_vel)
+    rpy_rates = rotation.ang_vel2rpy_rates(quat, ang_vel)
 
     if forces_motor is None:
         forces_motor_dot = None
@@ -201,7 +217,9 @@ def f_fitted_DI_rpyt_core(
         # Note: Due to the structure of the integrator, we split the commanded thrust into
         # four equal parts and later apply the sum as total thrust again. Those four forces
         # are not the true forces of the motors, but the sum is the true total thrust.
-        forces_motor_dot = 1 / constants.DI_D_ACC[2] * (cmd_f[..., None] / 4 - forces_motor)
+        forces_motor_dot = xp.asarray(
+            1 / constants.DI_D_ACC[2] * (cmd_f[..., None] / 4 - forces_motor)
+        )
         forces_sum = xp.sum(forces_motor, axis=-1)
         thrust = constants.DI_D_ACC[0] + constants.DI_D_ACC[1] * forces_sum
 
@@ -212,6 +230,7 @@ def f_fitted_DI_rpyt_core(
     if forces_dist is not None:
         # Adding force disturbances to the state
         vel_dot = vel_dot + forces_dist / constants.MASS
+    vel_dot = xp.asarray(vel_dot)
 
     # Rotational equation of motion
     quat_dot = quat_dot_from_ang_vel(quat, ang_vel)
@@ -227,7 +246,8 @@ def f_fitted_DI_rpyt_core(
             + constants.DI_D_PARAMS[:, 1] * rpy_rates
             + constants.DI_D_PARAMS[:, 2] * cmd_rpy
         )
-    ang_vel_dot = R.rpy_rates_deriv2ang_vel_deriv(quat, rpy_rates, rpy_rates_dot)
+    rpy_rates_dot = xp.asarray(rpy_rates_dot)
+    ang_vel_dot = rotation.rpy_rates_deriv2ang_vel_deriv(quat, rpy_rates, rpy_rates_dot)
     if torques_dist is not None:
         # adding torque disturbances to the state
         # angular acceleration can be converted to total torque
@@ -276,7 +296,7 @@ def f_fitted_DI_DD_rpyt(
     cmd_rpy = command[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
-    rpy_rates = R.ang_vel2rpy_rates(quat, ang_vel)
+    rpy_rates = rotation.ang_vel2rpy_rates(quat, ang_vel)
 
     if forces_motor is None:
         raise NotImplementedError
@@ -307,7 +327,7 @@ def f_fitted_DI_DD_rpyt(
         + constants.DI_DD_PARAMS[:, 1] * rpy_rates
         + constants.DI_DD_PARAMS[:, 2] * cmd_rpy
     )
-    ang_vel_dot = R.rpy_rates2ang_vel(quat, rpy_rates_dot)
+    ang_vel_dot = rotation.rpy_rates2ang_vel(quat, rpy_rates_dot)
     if torques_dist is not None:
         # adding disturbances to the state
         # adding torque is a little more complex:

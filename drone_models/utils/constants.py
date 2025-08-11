@@ -5,16 +5,12 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Type
 
 import numpy as np
 
 if TYPE_CHECKING:
-    from jax import Array as JaxArray
-    from numpy.typing import NDArray
-    from torch import Tensor
-
-    Array = NDArray | JaxArray | Tensor
+    from array_api_compat.typing import Array
 
 
 @dataclass
@@ -65,10 +61,10 @@ class Constants:
     DI_DD_ACC: Array
 
     # Configs (used in testing)
-    available_configs: tuple[str] = ("cf2x_L250", "cf2x_P250", "cf2x_T350")
+    available_configs: tuple = ("cf2x_L250", "cf2x_P250", "cf2x_T350")
 
     @classmethod
-    def from_file(cls, path: str) -> Constants:
+    def from_file(cls, path: str, xp: Type[Array]) -> Constants:
         """Creates constants based on the xml file at the given location.
 
         The constants are supposed to be under the costum/numeric category.
@@ -79,17 +75,16 @@ class Constants:
         params = ET.parse(drone_path).findall(".//custom/numeric")
         # create a dict from parameters containing array of floats
         params = {
-            p.get("name"): np.array(list(map(float, p.get("data").split())))
-            for p in params
+            p.get("name"): xp.asarray(list(map(float, p.get("data").split()))) for p in params
         }
 
         GRAVITY = params["gravity"][0]
-        GRAVITY_VEC = np.array([0, 0, -GRAVITY])
+        GRAVITY_VEC = xp.stack([xp.asarray(0.0), xp.asarray(0.0), -GRAVITY])
         MASS = params["mass"][0]
-        J = params["J"].reshape((3, 3))
-        J_INV = np.linalg.inv(J)
+        J = xp.reshape(params["J"], (3, 3))
+        J_INV = xp.linalg.inv(J)
         L = params["arm"][0]
-        SIGN_MATRIX = params["sign_matrix"].reshape((4, 3))
+        SIGN_MATRIX = xp.reshape(params["sign_matrix"], (4, 3))
 
         PWM_MIN = params["PWM_MIN"][0]
         PWM_MAX = params["PWM_MAX"][0]
@@ -103,26 +98,26 @@ class Constants:
         SI_ROLL = params["SI_roll"]
         SI_PITCH = params["SI_pitch"]
         SI_YAW = params["SI_yaw"]
-        SI_PARAMS = np.vstack((SI_ROLL, SI_PITCH, SI_YAW))
+        SI_PARAMS = xp.stack((SI_ROLL, SI_PITCH, SI_YAW), axis=0)
         SI_ACC = params["SI_acc"]
 
         # System Identification parameters for the double integrator (DI) model
         DI_ROLL = params["DI_roll"]
         DI_PITCH = params["DI_pitch"]
         DI_YAW = params["DI_yaw"]
-        DI_PARAMS = np.vstack((DI_ROLL, DI_PITCH, DI_YAW))
+        DI_PARAMS = xp.stack((DI_ROLL, DI_PITCH, DI_YAW), axis=0)
         DI_ACC = params["DI_acc"]
 
         DI_D_ROLL = params["DI_D_roll"]
         DI_D_PITCH = params["DI_D_pitch"]
         DI_D_YAW = params["DI_D_yaw"]
-        DI_D_PARAMS = np.vstack((DI_D_ROLL, DI_D_PITCH, DI_D_YAW))
+        DI_D_PARAMS = xp.stack((DI_D_ROLL, DI_D_PITCH, DI_D_YAW), axis=0)
         DI_D_ACC = params["DI_D_acc"]
 
         DI_DD_ROLL = params["DI_DD_roll"]
         DI_DD_PITCH = params["DI_DD_pitch"]
         DI_DD_YAW = params["DI_DD_yaw"]
-        DI_DD_PARAMS = np.vstack((DI_DD_ROLL, DI_DD_PITCH, DI_DD_YAW))
+        DI_DD_PARAMS = xp.stack((DI_DD_ROLL, DI_DD_PITCH, DI_DD_YAW), axis=0)
         DI_DD_ACC = params["DI_DD_acc"]
 
         return cls(
@@ -163,17 +158,17 @@ class Constants:
         )
 
     @classmethod
-    def from_config(cls, config: str) -> Constants:
+    def from_config(cls, config: str, xp: Type[Array]) -> Constants:
         """Creates constants based on the give configuration.
 
         For available configs see Constants.available_configs
         """
         match config:
             case "cf2x_L250":
-                return Constants.from_file("data/cf2x_L250.xml")
+                return Constants.from_file("data/cf2x_L250.xml", xp)
             case "cf2x_P250":
-                return Constants.from_file("data/cf2x_P250.xml")
+                return Constants.from_file("data/cf2x_P250.xml", xp)
             case "cf2x_T350":
-                return Constants.from_file("data/cf2x_T350.xml")
+                return Constants.from_file("data/cf2x_T350.xml", xp)
             case _:
                 raise ValueError(f"Drone config '{config}' is not supported")

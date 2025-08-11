@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
     from torch import Tensor
 
-    from lsy_models.utils.constants import Constants
+    from drone_models.utils.constants import Constants
 
     Array = NDArray | JaxArray | Tensor
 
