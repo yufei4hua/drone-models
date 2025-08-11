@@ -18,116 +18,6 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-def quat_dot_from_ang_vel(quat: Array, ang_vel: Array) -> Array:
-    """Calculates the quaternion derivative based on an angular velocity."""
-    xp = quat.__array_namespace__()
-
-    # Split angular velocity
-    x = ang_vel[..., 0:1]
-    y = ang_vel[..., 1:2]
-    z = ang_vel[..., 2:3]
-
-    # Skew-symmetric matrix
-    ang_vel_skew = xp.stack(
-        [
-            xp.concat((xp.zeros_like(x), -z, y), axis=-1),
-            xp.concat((z, xp.zeros_like(x), -x), axis=-1),
-            xp.concat((-y, x, xp.zeros_like(x)), axis=-1),
-        ],
-        axis=-2,
-    )
-
-    # First row of Xi
-    xi1 = xp.concat((xp.zeros_like(x), -ang_vel), axis=-1)
-
-    # Second to fourth rows of Xi
-    ang_vel_col = xp.expand_dims(ang_vel, axis=-1)  # (..., 3, 1)
-    xi2 = xp.concat((ang_vel_col, -ang_vel_skew), axis=-1)  # (..., 3, 4)
-
-    # Combine into Xi
-    xi1_exp = xp.expand_dims(xi1, axis=-2)  # (..., 1, 4)
-    xi = xp.concat((xi1_exp, xi2), axis=-2)  # (..., 4, 4)
-
-    # Quaternion derivative
-    quat_exp = xp.expand_dims(quat, axis=-1)  # (..., 4, 1)
-    result = 0.5 * xp.matmul(xi, quat_exp)  # (..., 4, 1)
-    return xp.squeeze(result, axis=-1)  # (..., 4)
-
-
-def f_first_principles(
-    pos: Array,
-    quat: Array,
-    vel: Array,
-    ang_vel: Array,
-    command: Array,
-    constants: Constants,
-    forces_motor: Array | None = None,
-    forces_dist: Array | None = None,
-    torques_dist: Array | None = None,
-) -> tuple[Array, Array, Array, Array, Array | None]:
-    """First principles model for a quatrotor.
-
-    The input consists of four forces in [N]. TODO more detail.
-
-    Based on the quaternion model from https://www.dynsyslab.org/wp-content/papercite-data/pdf/mckinnon-robot20.pdf
-
-    Warning:
-        Do not use quat_dot directly for integration! Only usage of ang_vel is mathematically correct.
-        If you still decide to use quat_dot to integrate, ensure unit length!
-        More information https://ahrs.readthedocs.io/en/latest/filters/angular.html
-
-    forces_motor are the four indiviual forces of the propellers in body frame
-    forces_dist and torques_dist are vectors in world frame
-    """
-    xp = pos.__array_namespace__()  # This looks into the type of the position array and decides what implementation to use (numpy, jax, etc)
-    rot = R.from_quat(quat)
-
-    # Thrust dynamics
-    if forces_motor is None:
-        forces_motor_dot = None
-        forces_motor = command
-    else:
-        forces_motor_dot = xp.asarray(constants.THRUST_TAU * (command - forces_motor))  # TODO 1/TAU
-    # Creating force and torque vector
-    forces_motor_tot = xp.sum(forces_motor, axis=-1)
-    # forces_motor_tot = xp.sum(
-    #     command, axis=-1
-    # )  # Without motor dynamics TODO make motor forces None
-    zeros = xp.zeros_like(forces_motor_tot)
-    forces_motor_vec = xp.stack((zeros, zeros, forces_motor_tot), axis=-1)
-    # Torques in x & y are simply the force x distance.
-    # Because there currently is no way to identify the z torque in relation to the thrust,
-    # we rely on a old identified value that can compute rpm to torque.
-    # force = kf * rpm², torque = km * rpm² => torque = km/kf*force
-    torques_motor_vec = xp.matmul(forces_motor, constants.SIGN_MATRIX) * xp.stack(
-        [constants.L, constants.L, constants.KM / constants.KF]
-    )
-
-    # Linear equation of motion
-    forces_motor_vec_world = rot.apply(forces_motor_vec)
-
-    force_world_frame = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
-    if forces_dist is not None:
-        force_world_frame = force_world_frame + forces_dist
-
-    pos_dot = vel
-    vel_dot = force_world_frame / constants.MASS
-
-    # Rotational equation of motion
-
-    torques = torques_motor_vec
-    if torques_dist is not None:
-        # paper: rot.as_matrix() @ torques_dist
-        torques = torques + rot.apply(torques_dist)
-    quat_dot = quat_dot_from_ang_vel(quat, ang_vel)
-    ang_vel_dot = xp.matmul(
-        torques - rotation.cross(ang_vel, xp.matmul(ang_vel, xp.asarray(constants.J).T)),
-        xp.asarray(constants.J_INV).T,
-    )
-
-    return pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot
-
-
 def f_fitted_DI_rpyt(
     pos: Array,
     quat: Array,
@@ -251,7 +141,7 @@ def f_fitted_DI_rpyt_core(
     if torques_dist is not None:
         # adding torque disturbances to the state
         # angular acceleration can be converted to total torque
-        torque = xp.matvec(constants.J, ang_vel_dot) - xp.cross(
+        torque = xp.matvec(constants.J, ang_vel_dot) - xp.linalg.cross(
             ang_vel, xp.matvec(constants.J, ang_vel)
         )
         # adding torque
@@ -332,7 +222,7 @@ def f_fitted_DI_DD_rpyt(
         # adding disturbances to the state
         # adding torque is a little more complex:
         # angular acceleration can be converted to torque
-        torque = xp.matvec(constants.J, ang_vel_dot) - xp.cross(
+        torque = xp.matvec(constants.J, ang_vel_dot) - xp.linalg.cross(
             ang_vel, xp.matvec(constants.J, ang_vel)
         )
         # adding torque

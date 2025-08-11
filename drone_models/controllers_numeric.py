@@ -17,16 +17,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from array_api_compat import array_namespace
+
 import drone_models.utils.cf2 as cf2
 import drone_models.utils.rotation as R
 from drone_models.utils.constants_controllers import cntrl_const_mel
 
 if TYPE_CHECKING:
-    from jax import Array as JaxArray
-    from numpy.typing import NDArray
-    from torch import Tensor
-
-    Array = NDArray | JaxArray | Tensor
+    from array_api_compat.typing import Array
 
     from drone_models.utils.constants import Constants
 
@@ -116,10 +114,10 @@ def cntrl_mellinger_position(
     x_c_des_z = x_c_des_y * 0  # to get zeros in the correct shape
     x_c_des = xp.stack((x_c_des_x, x_c_des_y, x_c_des_z), axis=-1)
     # [yB_des]
-    y_axis_desired = xp.cross(z_axis_desired, x_c_des)
+    y_axis_desired = xp.linalg.cross(z_axis_desired, x_c_des)
     y_axis_desired = y_axis_desired / xp.linalg.norm(y_axis_desired)
     # [xB_des]
-    x_axis_desired = xp.cross(y_axis_desired, z_axis_desired)
+    x_axis_desired = xp.linalg.cross(y_axis_desired, z_axis_desired)
 
     # converting desired axis to rotation matrix and then to RPY
     matrix = xp.stack((x_axis_desired, y_axis_desired, z_axis_desired), axis=-1)
@@ -238,7 +236,7 @@ def fw_power_distribution_flapper():
     raise NotImplementedError("Don't know yet what flapper is for")
 
 
-def fw_power_distribution_legacy(control: dict[str, Array]) -> Array:
+def fw_power_distribution_legacy(roll: Array, pitch: Array, yaw: Array, thrust: Array) -> Array:
     """Legacy power distribution from power_distribution_quadrotor.c working with PWM signals.
 
     Args:
@@ -247,13 +245,11 @@ def fw_power_distribution_legacy(control: dict[str, Array]) -> Array:
     Returns:
         Array of the four commanded motor PWMs
     """
-    xp = control["thrust"].__array_namespace__()
-    roll = control["roll"]
-    pitch = control["pitch"]
-    m1_pwm = control["thrust"] - roll + pitch + control["yaw"]
-    m2_pwm = control["thrust"] - roll - pitch - control["yaw"]
-    m3_pwm = control["thrust"] + roll - pitch + control["yaw"]
-    m4_pwm = control["thrust"] + roll + pitch - control["yaw"]
+    xp = array_namespace(roll)
+    m1_pwm = thrust - roll + pitch + yaw
+    m2_pwm = thrust - roll - pitch - yaw
+    m3_pwm = thrust + roll - pitch + yaw
+    m4_pwm = thrust + roll + pitch - yaw
     return xp.stack((m1_pwm, m2_pwm, m3_pwm, m4_pwm), axis=-1)
 
 

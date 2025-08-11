@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 
+# TODO raise error if scipy is already loaded and the feature flag is not set
 os.environ["SCIPY_ARRAY_API"] = "1"  # Feature flag to activate Array API in scipy
 import re
 from typing import TYPE_CHECKING
@@ -21,17 +22,6 @@ if TYPE_CHECKING:
 # Activating Array API in scipy and force reloading the package
 # os.environ["SCIPY_ARRAY_API"] = "1"
 # importlib.reload(scipy.spatial.transform)
-
-
-def cross(a: Array, b: Array) -> Array:
-    """TODO. Also test this function agains numpy cross."""
-    xp = a.__array_namespace__()
-    ax, ay, az = a[..., 0:1], a[..., 1:2], a[..., 2:3]
-    bx, by, bz = b[..., 0:1], b[..., 1:2], b[..., 2:3]
-    cx = ay * bz - az * by
-    cy = az * bx - ax * bz
-    cz = ax * by - ay * bx
-    return xp.concat((cx, cy, cz), axis=-1)
 
 
 def quat_mult(q1: Array, q2: Array) -> Array:
@@ -55,6 +45,42 @@ def quat_conj(q: Array) -> Array:
     """TODO remove and use scipy implementation."""
     xp = q.__array_namespace__()
     return xp.concat([-q[..., :3], q[..., 3:]], axis=-1)
+
+
+def ang_vel2quat_dot(quat: Array, ang_vel: Array) -> Array:
+    """Calculates the quaternion derivative based on an angular velocity."""
+    xp = quat.__array_namespace__()
+
+    # Split angular velocity
+    x = ang_vel[..., 0:1]
+    y = ang_vel[..., 1:2]
+    z = ang_vel[..., 2:3]
+
+    # Skew-symmetric matrix
+    ang_vel_skew = xp.stack(
+        [
+            xp.concat((xp.zeros_like(x), -z, y), axis=-1),
+            xp.concat((z, xp.zeros_like(x), -x), axis=-1),
+            xp.concat((-y, x, xp.zeros_like(x)), axis=-1),
+        ],
+        axis=-2,
+    )
+
+    # First row of Xi
+    xi1 = xp.concat((xp.zeros_like(x), -ang_vel), axis=-1)
+
+    # Second to fourth rows of Xi
+    ang_vel_col = xp.expand_dims(ang_vel, axis=-1)  # (..., 3, 1)
+    xi2 = xp.concat((ang_vel_col, -ang_vel_skew), axis=-1)  # (..., 3, 4)
+
+    # Combine into Xi
+    xi1_exp = xp.expand_dims(xi1, axis=-2)  # (..., 1, 4)
+    xi = xp.concat((xi1_exp, xi2), axis=-2)  # (..., 4, 4)
+
+    # Quaternion derivative
+    quat_exp = xp.expand_dims(quat, axis=-1)  # (..., 4, 1)
+    result = 0.5 * xp.matmul(xi, quat_exp)  # (..., 4, 1)
+    return xp.squeeze(result, axis=-1)  # (..., 4)
 
 
 def ang_vel2rpy_rates(quat: Array, ang_vel: Array) -> Array:
