@@ -29,3 +29,13 @@ jobs:
 
       - name: Run tests
         run: $HOME/.pixi/bin/pixi run -e test python -m pytest
+
+      - name: Save Pixi cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            $HOME/.pixi/envs
+            $HOME/.pixi/pkgs
+            $HOME/.pixi/indices
+          key: ${{ runner.os }}-pixi-${{ hashFiles('pyproject.toml') }}
