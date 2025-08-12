@@ -8,14 +8,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Cache Pixi envs & packages
       - name: Cache Pixi
         uses: actions/cache@v4
         with:
           path: |
             ~/.pixi/envs
             ~/.pixi/pkgs
-          key: ${{ runner.os }}-pixi-${{ hashFiles('pyproject.toml', 'pixi.lock') }}
+            ~/.pixi/indices
+          key: ${{ runner.os }}-pixi-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pixi-
 
