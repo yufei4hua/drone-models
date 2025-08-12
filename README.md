@@ -21,7 +21,7 @@ Drone models @ LSY. Contains symbolic (CasADi) and numeric (ArrayAPI, i.e., NumP
 
 1. Clone repository `git clone git@github.com:utiasDSL/drone-models.git`
 2. Enter repository `cd drone-models`
-3. Install locally with `pip install -e .`
+3. Install locally with `pip install -e .` or the pixi environment with `pixi install`, which can be activated with `pixi shell`
 
 
 ## Usage
