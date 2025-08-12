@@ -108,3 +108,4 @@ test = { features = ["test"], solve-group = "default" }
 gcc = ">=15.1.0,<15.2"
 cxx-compiler = ">=1.0.0,<2"
 gfortran = ">=15.1.0,<15.2"
+openblas = ">=0.3.30,<0.4"
