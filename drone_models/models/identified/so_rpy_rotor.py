@@ -40,7 +40,7 @@ def dynamics(
         cmd: Roll pitch yaw (rad) and collective thrust (N) command.
         constants: Containing the constants of the drone.
         rotor_vel: Speed of the 4 motors (rad/s). If None, the commanded thrust is directly
-            applied. If value is given, rotor dynamics are calculated.
+            applied (not recommended). If value is given, rotor dynamics are calculated.
         dist_f: Disturbance force acting on the CoM (N).
         dist_t: Disturbance torque acting on the CoM (Nm).
 
