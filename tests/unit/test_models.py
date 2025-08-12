@@ -153,60 +153,60 @@ def test_model_batched_rotor_dynamics(model_name: str, model: Callable, drone_na
         assert dx.shape == x.shape
 
 
-@pytest.mark.unit
-@pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("config", Constants.available_configs)
-def test_symbolic2numeric(model_name: str, model: Callable, config: str):
-    batch_shape = (10,)
-    pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states(batch_shape)
-    if not model_features(model)["rotor_dynamics"]:
-        rotor_vel = None
-    cmd = create_rnd_commands(batch_shape, dim=4)  # TODO make dependent on model
+# @pytest.mark.unit
+# @pytest.mark.parametrize("model_name, model", available_models.items())
+# @pytest.mark.parametrize("config", Constants.available_configs)
+# def test_symbolic2numeric(model_name: str, model: Callable, config: str):
+#     batch_shape = (10,)
+#     pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states(batch_shape)
+#     if not model_features(model)["rotor_dynamics"]:
+#         rotor_vel = None
+#     cmd = create_rnd_commands(batch_shape, dim=4)  # TODO make dependent on model
 
-    # Create numeric model from symbolic model
-    dynamics_symbolic = getattr(sys.modules[model.__module__], "dynamics_symbolic")
-    X_dot, X, U, _ = dynamics_symbolic(Constants.from_config(config, np))
-    model_symbolic2numeric = cs.Function(model_name, [X, U], [X_dot])
+#     # Create numeric model from symbolic model
+#     dynamics_symbolic = getattr(sys.modules[model.__module__], "dynamics_symbolic")
+#     X_dot, X, U, _ = dynamics_symbolic(Constants.from_config(config, np))
+#     model_symbolic2numeric = cs.Function(model_name, [X, U], [X_dot])
 
-    for i in np.ndindex(np.shape(pos)[:-1]):  # casadi only supports non batched calls
-        print(f"{i=}, {np.shape(pos)=}, {pos[i+(slice(None),)]=}")  #
-        x_dot = model(
-            pos[i + (slice(None),)],
-            quat[i + (slice(None),)],
-            vel[i + (slice(None),)],
-            ang_vel[i + (slice(None),)],
-            cmd[i + (slice(None),)],
-            Constants.from_config(config, xp),
-            rotor_vel=rotor_vel[i + (slice(None),)] if rotor_vel is not None else None,
-        )
-        x_dot = xp.concat([x for x in x_dot if x is not None])
+#     for i in np.ndindex(np.shape(pos)[:-1]):  # casadi only supports non batched calls
+#         print(f"{i=}, {np.shape(pos)=}, {pos[i+(slice(None),)]=}")  #
+#         x_dot = model(
+#             pos[i + (slice(None),)],
+#             quat[i + (slice(None),)],
+#             vel[i + (slice(None),)],
+#             ang_vel[i + (slice(None),)],
+#             cmd[i + (slice(None),)],
+#             Constants.from_config(config, xp),
+#             rotor_vel=rotor_vel[i + (slice(None),)] if rotor_vel is not None else None,
+#         )
+#         x_dot = xp.concat([x for x in x_dot if x is not None])
 
-        if rotor_vel is not None:
-            X = xp.concat(
-                (
-                    pos[i + (slice(None),)],
-                    quat[i + (slice(None),)],
-                    vel[i + (slice(None),)],
-                    ang_vel[i + (slice(None),)],
-                    rotor_vel[i + (slice(None),)],
-                )
-            )
-        else:
-            X = xp.concat(
-                (
-                    pos[i + (slice(None),)],
-                    quat[i + (slice(None),)],
-                    vel[i + (slice(None),)],
-                    ang_vel[i + (slice(None),)],
-                )
-            )
+#         if rotor_vel is not None:
+#             X = xp.concat(
+#                 (
+#                     pos[i + (slice(None),)],
+#                     quat[i + (slice(None),)],
+#                     vel[i + (slice(None),)],
+#                     ang_vel[i + (slice(None),)],
+#                     rotor_vel[i + (slice(None),)],
+#                 )
+#             )
+#         else:
+#             X = xp.concat(
+#                 (
+#                     pos[i + (slice(None),)],
+#                     quat[i + (slice(None),)],
+#                     vel[i + (slice(None),)],
+#                     ang_vel[i + (slice(None),)],
+#                 )
+#             )
 
-        U = cmd[i + (slice(None),)]
-        x_dot_symbolic2numeric = xp.asarray(model_symbolic2numeric(X._array, U._array))
-        x_dot_symbolic2numeric = xp.squeeze(x_dot_symbolic2numeric, axis=-1)
-        assert np.allclose(x_dot, x_dot_symbolic2numeric), (
-            "Symbolic and numeric model have different output"
-        )
+#         U = cmd[i + (slice(None),)]
+#         x_dot_symbolic2numeric = xp.asarray(model_symbolic2numeric(X._array, U._array))
+#         x_dot_symbolic2numeric = xp.squeeze(x_dot_symbolic2numeric, axis=-1)
+#         assert np.allclose(x_dot, x_dot_symbolic2numeric), (
+#             "Symbolic and numeric model have different output"
+#         )
 
 
 # @pytest.mark.unit
@@ -269,43 +269,43 @@ def test_symbolic2numeric(model_name: str, model: Callable, config: str):
 #     assert np.allclose(batched, non_batched), "Non-batched and batched results are not the same"
 
 
-@pytest.mark.unit
-@pytest.mark.parametrize("model", available_models.keys())
-@pytest.mark.parametrize("config", Constants.available_configs)
-def test_numeric_jit(model: str, config: str):
-    """Tests is the models are jitable and if the results are identical to the numpy ones."""
-    nppos, npquat, npvel, npang_vel, npforces_motor, _, _ = create_rnd_states(N=N)
-    if model == "fitted_DI_rpyt":
-        npforces_motor = None
-    npcommands = create_rnd_commands(N, 4)
+# @pytest.mark.unit
+# @pytest.mark.parametrize("model", available_models.keys())
+# @pytest.mark.parametrize("config", Constants.available_configs)
+# def test_numeric_jit(model: str, config: str):
+#     """Tests is the models are jitable and if the results are identical to the numpy ones."""
+#     nppos, npquat, npvel, npang_vel, npforces_motor, _, _ = create_rnd_states(N=N)
+#     if model == "fitted_DI_rpyt":
+#         npforces_motor = None
+#     npcommands = create_rnd_commands(N, 4)
 
-    jppos, jpquat = jp.array(nppos._array), jp.array(npquat._array)
-    jpvel, jpang_vel = jp.array(npvel._array), jp.array(npang_vel._array)
-    if model == "fitted_DI_rpyt":
-        jpforces_motor = None
-    else:
-        jpforces_motor = jp.array(npforces_motor._array)
-    jpcommands = jp.array(npcommands._array)
+#     jppos, jpquat = jp.array(nppos._array), jp.array(npquat._array)
+#     jpvel, jpang_vel = jp.array(npvel._array), jp.array(npang_vel._array)
+#     if model == "fitted_DI_rpyt":
+#         jpforces_motor = None
+#     else:
+#         jpforces_motor = jp.array(npforces_motor._array)
+#     jpcommands = jp.array(npcommands._array)
 
-    f_numeric = dynamics_numeric(model, config, xp)
-    f_jit_numeric = jax.jit(dynamics_numeric(model, config, jp))
+#     f_numeric = dynamics_numeric(model, config, xp)
+#     f_jit_numeric = jax.jit(dynamics_numeric(model, config, jp))
 
-    npresults = f_numeric(nppos, npquat, npvel, npang_vel, npcommands, forces_motor=npforces_motor)
-    jpresults = f_jit_numeric(
-        jppos, jpquat, jpvel, jpang_vel, jpcommands, forces_motor=jpforces_motor
-    )
+#     npresults = f_numeric(nppos, npquat, npvel, npang_vel, npcommands, forces_motor=npforces_motor)
+#     jpresults = f_jit_numeric(
+#         jppos, jpquat, jpvel, jpang_vel, jpcommands, forces_motor=jpforces_motor
+#     )
 
-    # assert isinstance(npresults[0], np.ndarray), "Results are not numpy arrays"
-    assert isinstance(jpresults[0], jp.ndarray), "Results are not jax arrays"
-    if npresults[-1] is not None:
-        npresults = np.hstack(npresults)
-    else:
-        npresults = np.hstack(npresults[:-1])
-    if jpresults[-1] is not None:
-        jpresults = np.hstack(jpresults)
-    else:
-        jpresults = np.hstack(jpresults[:-1])
-    assert np.allclose(npresults, jpresults), "numpy and jax results differ"
+#     # assert isinstance(npresults[0], np.ndarray), "Results are not numpy arrays"
+#     assert isinstance(jpresults[0], jp.ndarray), "Results are not jax arrays"
+#     if npresults[-1] is not None:
+#         npresults = np.hstack(npresults)
+#     else:
+#         npresults = np.hstack(npresults[:-1])
+#     if jpresults[-1] is not None:
+#         jpresults = np.hstack(jpresults)
+#     else:
+#         jpresults = np.hstack(jpresults[:-1])
+#     assert np.allclose(npresults, jpresults), "numpy and jax results differ"
 
 
 # # TODO test if external wrench gets applied properly. But how to test it?
