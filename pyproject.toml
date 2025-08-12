@@ -13,7 +13,11 @@ classifiers = [
     "Intended Audience :: Science/Research",
 ]
 
-dependencies = ["numpy>=2.0.0", "array-api-compat"]
+dependencies = [
+    "numpy>=2.0.0",
+    "array-api-compat",
+    "scipy @ git+https://github.com/scipy/scipy.git@0f2342f",  # TODO: Replace with scipy 1.17 once released
+]
 
 [project.optional-dependencies]
 test = [
@@ -23,7 +27,6 @@ test = [
     "jax",
     "torch",
     "casadi",
-    "array-api-compat",
     "array-api-strict",
 ]
 
@@ -64,7 +67,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "D", "TCH", "ANN"]
-ignore = ["ANN401", "ANN101"]
+ignore = ["ANN401"]
 fixable = ["ALL"]
 unfixable = []
 
@@ -87,3 +90,14 @@ skip-magic-trailing-comma = true
 line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = "dynamic"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.pypi-dependencies]
+drone_models = { path = ".", editable = true }
+
+[tool.pixi.environments]
+default = { solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }

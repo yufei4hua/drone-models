@@ -32,19 +32,19 @@ def dynamics(
     """The fitted double integrator (DI) model with optional motor delay (D).
 
     Args:
-        pos (Array): Position of the drone (m)
-        quat (Array): Quaternion of the drone (xyzw)
-        vel (Array): Velocity of the drone (m/s)
-        ang_vel (Array): Angular velocity of the drone (rad/s)
-        command (Array): RPYT command (roll, pitch, yaw in rad, thrust in N)
-        constants (Constants): Containing the constants of the drone
-        rotor_vel (Array | None, optional): Thrust of the 4 motors in N. Defaults to None.
-            If None, the commanded thrust is directly applied. If value is given, thrust dynamics are calculated.
-        dist_f: Disturbance force acting on the CoM. Defaults to None.
-        dist_t: Disturbance torque acting on the CoM. Defaults to None.
+        pos: Position of the drone (m).
+        quat: Quaternion of the drone (xyzw).
+        vel: Velocity of the drone (m/s).
+        ang_vel: Angular velocity of the drone (rad/s).
+        command: Roll pitch yaw (rad) and collective thrust (N) command.
+        constants: Containing the constants of the drone.
+        rotor_vel: Thrust of the 4 motors in N. If None, the commanded thrust is directly applied.
+            If a value is given, thrust dynamics are calculated.
+        dist_f: Disturbance force (N) acting on the CoM.
+        dist_t: Disturbance torque (Nm) acting on the CoM.
 
     Returns:
-        tuple[Array, Array, Array, Array, Array | None]: _description_
+        The derivatives of all state variables.
     """
     xp = array_namespace(pos)
     cmd_f = command[..., -1]
@@ -97,4 +97,10 @@ def dynamics(
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
 
-def symbolic_dynamics(): ...
+def symbolic_dynamics():
+    """Symbolic dynamics of the fitted double integrator (DI) model with optional motor delay (D).
+
+    Returns:
+        The symbolic derivatives of all state variables.
+    """
+    ...

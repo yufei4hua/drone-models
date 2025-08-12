@@ -239,9 +239,6 @@ def fw_power_distribution_flapper():
 def fw_power_distribution_legacy(roll: Array, pitch: Array, yaw: Array, thrust: Array) -> Array:
     """Legacy power distribution from power_distribution_quadrotor.c working with PWM signals.
 
-    Args:
-        control: dictionary of the same form as the control type in the firmware
-
     Returns:
         Array of the four commanded motor PWMs
     """

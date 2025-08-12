@@ -1,3 +1,9 @@
+"""Transformations between physical parameters of the quadrotors.
+
+Conversions such as from motor forces to rotor speeds, or from thrust to PWM, are bundled in this
+module.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
