@@ -7,15 +7,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: mamba-org/setup-micromamba@v1
+
+      - name: Cache Pixi
+        uses: actions/cache@v4
         with:
-          micromamba-version: '2.0.2-1' # any version from https://github.com/mamba-org/micromamba-releases
-          environment-name: test-env
-          init-shell: bash
-          create-args: python=3.11
-      - name: Install dependencies and package
-        run: pip install .[test]
-        shell: micromamba-shell {0}
-      - name: Test with pytest
-        run: pytest tests
-        shell: micromamba-shell {0}
+          path: |
+            ~/.pixi/envs
+            ~/.pixi/pkgs
+            ~/.pixi/indices
+          key: ${{ runner.os }}-pixi-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pixi-
+
+      - name: Install Pixi
+        run: |
+          curl -fsSL https://pixi.sh/install.sh | bash
+          echo "$HOME/.pixi/bin" >> $GITHUB_PATH
+          $HOME/.pixi/bin/pixi --version
+
+      - name: Install test environment
+        run: $HOME/.pixi/bin/pixi install -e test
+
+      - name: Run tests
+        run: $HOME/.pixi/bin/pixi run -e test python -m pytest
