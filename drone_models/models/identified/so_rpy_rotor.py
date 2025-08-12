@@ -56,7 +56,7 @@ def dynamics(
 
     if rotor_vel is None:
         rotor_vel_dot = None
-        rotor_vel = xp.asarray(cmd_rotor_vel)
+        rotor_vel = cmd_rotor_vel
     else:
         rotor_vel_dot = (
             1 / constants.ROTOR_TAU * (cmd_rotor_vel - rotor_vel)
@@ -68,7 +68,7 @@ def dynamics(
     # are not the true forces of the motors, but the sum is the true total thrust.
     rotor_vel_dot = (
         xp.asarray(1 / constants.DI_D_ACC[2] * (cmd_rotor_vel - rotor_vel))
-        - constants.DI_D_ACC[3] * rotor_vel**2
+        - constants.KM * rotor_vel**2
     )
     forces_motor = xp.sum(constants.KF * rotor_vel**2, axis=-1)
     forces_sum = xp.sum(forces_motor, axis=-1)

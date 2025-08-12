@@ -9,6 +9,7 @@ import array_api_strict as xp
 import jax
 import jax.numpy as jp
 import pytest
+from array_api_compat import device as xp_device
 
 from drone_models.models import available_models, model_features
 from drone_models.utils.constants import Constants
@@ -19,24 +20,24 @@ if TYPE_CHECKING:
 # For all tests to pass, we need the same precsion in jax as in np
 jax.config.update("jax_enable_x64", True)
 
-N = 100
 
-
-def create_rnd_states(N: int = 1000) -> tuple[Array, Array, Array, Array, Array, Array, Array]:
+def create_rnd_states(
+    shape: tuple[int, ...] = (),
+) -> tuple[Array, Array, Array, Array, Array, Array, Array]:
     """Creates N random states."""
-    pos = xp.asarray(np.random.uniform(-5, 5, (N, 3)))
-    quat = xp.asarray(np.random.uniform(-1, 1, (N, 4)))  # Libraries normalize automatically
-    vel = xp.asarray(np.random.uniform(-5, 5, (N, 3)))
-    ang_vel = xp.asarray(np.random.uniform(-2, 2, (N, 3)))
-    rotor_vel = xp.asarray(np.random.uniform(0, 0.2, (N, 4)))
-    forces_dist = xp.asarray(np.random.uniform(-0.2, 0.2, (N, 3)))
-    torques_dist = xp.asarray(np.random.uniform(-0.05, 0.05, (N, 3)))
+    pos = xp.asarray(np.random.uniform(-5, 5, shape + (3,)))
+    quat = xp.asarray(np.random.uniform(-1, 1, shape + (4,)))  # Libraries normalize automatically
+    vel = xp.asarray(np.random.uniform(-5, 5, shape + (3,)))
+    ang_vel = xp.asarray(np.random.uniform(-2, 2, shape + (3,)))
+    rotor_vel = xp.asarray(np.random.uniform(0, 0.2, shape + (4,)))
+    forces_dist = xp.asarray(np.random.uniform(-0.2, 0.2, shape + (3,)))
+    torques_dist = xp.asarray(np.random.uniform(-0.05, 0.05, shape + (3,)))
     return pos, quat, vel, ang_vel, rotor_vel, forces_dist, torques_dist
 
 
-def create_rnd_commands(N: int = 1000, dim: int = 4) -> Array:
+def create_rnd_commands(shape: tuple[int, ...] = (), dim: int = 4) -> Array:
     """Creates N random inputs with size dim."""
-    return xp.asarray(np.random.uniform(0, 0.2, (N, dim)))
+    return xp.asarray(np.random.uniform(0, 0.2, shape + (dim,)))
 
 
 def skip_models_without_features(model: Callable, features: list[str]):
@@ -65,28 +66,43 @@ def test_model_features(model_name: str, model: Callable):
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
 @pytest.mark.parametrize("drone_name", Constants.available_configs)
-@pytest.mark.parametrize("rotor_dynamics", [False, True])
-def test_model_single_input(
-    model_name: str, model: Callable, drone_name: str, rotor_dynamics: bool
-):
-    if rotor_dynamics:
-        skip_models_without_features(model, ["rotor_dynamics"])
-
-    pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states(1)
-    if not rotor_dynamics:
-        rotor_vel = None
-    commands = create_rnd_commands(1, 4)  # TODO make dependent on model
-    x_dot = model(
-        pos[0, ...],
-        quat[0, ...],
-        vel[0, ...],
-        ang_vel[0, ...],
-        commands[0, ...],
-        Constants.from_config(drone_name, xp),
-        rotor_vel=rotor_vel[0, ...] if rotor_vel is not None else None,
+def test_model_single_input_no_rotor_dynamics(model_name: str, model: Callable, drone_name: str):
+    pos, quat, vel, ang_vel, _, _, _ = create_rnd_states()
+    commands = create_rnd_commands(dim=4)  # TODO make dependent on model
+    dpos, dquat, dvel, dang_vel, drotor_vel = model(
+        pos, quat, vel, ang_vel, commands, Constants.from_config(drone_name, xp), rotor_vel=None
     )
-    x_dot = xp.concat([x for x in x_dot if x is not None])
-    assert x_dot.shape == (13,)
+    # Check if the output is on the correct device, has the correct type and shape
+    for dx, x in zip([dpos, dquat, dvel, dang_vel], [pos, quat, vel, ang_vel], strict=True):
+        assert isinstance(dx, type(x))
+        assert xp_device(dx) == xp_device(x)
+        assert dx.shape == x.shape
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("model_name, model", available_models.items())
+@pytest.mark.parametrize("drone_name", Constants.available_configs)
+def test_model_single_input_rotor_dynamics(model_name: str, model: Callable, drone_name: str):
+    skip_models_without_features(model, ["rotor_dynamics"])
+
+    pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states()
+    commands = create_rnd_commands(dim=4)  # TODO make dependent on model
+    dpos, dquat, dvel, dang_vel, drotor_vel = model(
+        pos,
+        quat,
+        vel,
+        ang_vel,
+        commands,
+        Constants.from_config(drone_name, xp),
+        rotor_vel=rotor_vel,
+    )
+    # Check if the output is on the correct device, has the correct type and shape
+    for dx, x in zip(
+        [dpos, dquat, dvel, dang_vel, drotor_vel], [pos, quat, vel, ang_vel, rotor_vel], strict=True
+    ):
+        assert isinstance(dx, type(x))
+        assert xp_device(dx) == xp_device(x)
+        assert dx.shape == x.shape
 
 
 @pytest.mark.unit

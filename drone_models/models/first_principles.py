@@ -63,9 +63,7 @@ def dynamics(
     # Rotor dynamics
     if rotor_vel is None:
         rotor_vel_dot = None
-        rotor_vel = xpx.at(xp.empty_like(cmd))[...].set(
-            motor_force2rotor_speed(cmd[..., -1] / 4, constants.KF)
-        )
+        rotor_vel = cmd
     else:
         rotor_vel_dot = (
             1 / constants.ROTOR_TAU * (cmd - rotor_vel) - 1 / constants.ROTOR_D * rotor_vel**2
@@ -101,7 +99,6 @@ def dynamics(
         torques - xp.linalg.cross(ang_vel, xp.matmul(ang_vel, xp.asarray(constants.J).T)),
         xp.asarray(constants.J_INV).T,
     )
-    print(pos_dot.shape, quat_dot.shape, vel_dot.shape, ang_vel_dot.shape)
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
 
