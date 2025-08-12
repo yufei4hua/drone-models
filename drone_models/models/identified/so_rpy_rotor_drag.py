@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 from array_api_compat import array_namespace
@@ -38,8 +39,8 @@ def dynamics(
         ang_vel: Angular velocity of the drone (rad/s).
         command: Roll pitch yaw (rad) and collective thrust (N) command.
         constants: Containing the constants of the drone.
-        rotor_vel: Thrust of the 4 motors in N. If None, the commanded thrust is directly applied.
-            If a value is given, thrust dynamics are calculated.
+        rotor_vel: Speed of the 4 motors (rad/s). If None, the commanded thrust is directly
+            applied (not recommended). If value is given, rotor dynamics are calculated.
         dist_f: Disturbance force (N) acting on the CoM.
         dist_t: Disturbance torque (Nm) acting on the CoM.
 
@@ -48,16 +49,20 @@ def dynamics(
     """
     xp = array_namespace(pos)
     cmd_f = command[..., -1]
-    cmd_rotor_vel = motor_force2rotor_speed(cmd_f, constants.KF)
+    cmd_rotor_vel = motor_force2rotor_speed(cmd_f / 4, constants.KF)
     cmd_rpy = command[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
     rpy_rates = rotation.ang_vel2rpy_rates(quat, ang_vel)
 
-    rotor_vel_dot = (
-        xp.asarray(1 / constants.DI_DD_ACC[2] * (cmd_rotor_vel / 4 - rotor_vel))
-        - constants.DI_DD_ACC[3] * rotor_vel**2
-    )
+    if rotor_vel is None:
+        rotor_vel_dot = None
+        rotor_vel = cmd_rotor_vel
+        warnings.warn("Rotor velocity is not provided, using commanded rotor velocity directly.")
+    else:
+        rotor_vel_dot = (
+            1 / constants.DI_DD_ACC[2] * (cmd_rotor_vel - rotor_vel) - constants.KM * rotor_vel**2
+        )
     forces_motor = xp.sum(constants.KF * rotor_vel**2, axis=-1)
     forces_sum = xp.sum(forces_motor, axis=-1)
     thrust = constants.DI_DD_ACC[0] + constants.DI_DD_ACC[1] * forces_sum

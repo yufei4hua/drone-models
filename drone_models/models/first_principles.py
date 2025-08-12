@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
-import array_api_extra as xpx
 import casadi as cs
 from array_api_compat import array_namespace
 from scipy.spatial.transform import Rotation as R
 
 import drone_models.models.symbols as symbols
 from drone_models.models.utils import supports
-from drone_models.transform import motor_force2rotor_speed
 from drone_models.utils import rotation
 
 if TYPE_CHECKING:
@@ -43,7 +42,7 @@ def dynamics(
         quat: Quaternion of the drone (xyzw).
         vel: Velocity of the drone (m/s).
         ang_vel: Angular velocity of the drone (rad/s).
-        cmd: Roll pitch yaw (rad) and collective thrust (N) command.
+        cmd: Motor speeds (rad/s).
         constants: Containing the constants of the drone.
         rotor_vel: Angular velocity of the 4 motors (rad/s). If None, the commanded thrust is
             directly applied. If value is given, thrust dynamics are calculated.
@@ -64,9 +63,10 @@ def dynamics(
     if rotor_vel is None:
         rotor_vel_dot = None
         rotor_vel = cmd
+        warnings.warn("Rotor velocity is not provided, using commanded rotor velocity directly.")
     else:
         rotor_vel_dot = (
-            1 / constants.ROTOR_TAU * (cmd - rotor_vel) - 1 / constants.ROTOR_D * rotor_vel**2
+            1 / constants.THRUST_TAU * (cmd - rotor_vel) - 1 / constants.KM * rotor_vel**2
         )
     # Creating force and torque vector
     forces_motor = constants.KF * rotor_vel**2

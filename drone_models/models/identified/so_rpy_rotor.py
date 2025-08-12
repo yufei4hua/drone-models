@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 from array_api_compat import array_namespace
@@ -48,7 +49,7 @@ def dynamics(
     """
     xp = array_namespace(pos)
     cmd_f = cmd[..., -1]
-    cmd_rotor_vel = motor_force2rotor_speed(cmd_f, constants.KF)
+    cmd_rotor_vel = motor_force2rotor_speed(cmd_f / 4, constants.KF)
     cmd_rpy = cmd[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
@@ -57,19 +58,11 @@ def dynamics(
     if rotor_vel is None:
         rotor_vel_dot = None
         rotor_vel = cmd_rotor_vel
+        warnings.warn("Rotor velocity is not provided, using commanded rotor velocity directly.")
     else:
         rotor_vel_dot = (
-            1 / constants.ROTOR_TAU * (cmd_rotor_vel - rotor_vel)
-            - 1 / constants.ROTOR_D * rotor_vel**2
+            1 / constants.DI_D_ACC[2] * (cmd_rotor_vel - rotor_vel) - constants.KM * rotor_vel**2
         )
-
-    # Note: Due to the structure of the integrator, we split the commanded thrust into
-    # four equal parts and later apply the sum as total thrust again. Those four forces
-    # are not the true forces of the motors, but the sum is the true total thrust.
-    rotor_vel_dot = (
-        xp.asarray(1 / constants.DI_D_ACC[2] * (cmd_rotor_vel - rotor_vel))
-        - constants.KM * rotor_vel**2
-    )
     forces_motor = xp.sum(constants.KF * rotor_vel**2, axis=-1)
     forces_sum = xp.sum(forces_motor, axis=-1)
     thrust = constants.DI_D_ACC[0] + constants.DI_D_ACC[1] * forces_sum

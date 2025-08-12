@@ -38,7 +38,7 @@ def dynamics(
         cmd: Roll pitch yaw (rad) and collective thrust (N) command.
         constants: Containing the constants of the drone.
         rotor_vel: Speed of the 4 motors (rad/s). If None, the commanded thrust is directly
-            applied. If a value is given, the rotor speed dynamics are calculated.
+            applied. If a value is given, the function raises an error.
         dist_f: Disturbance force (N) acting on the CoM.
         dist_t: Disturbance torque (Nm) acting on the CoM.
 
@@ -46,8 +46,7 @@ def dynamics(
         The derivatives of all state variables.
     """
     xp = array_namespace(pos)
-    cmd_rotor_vel = cmd[..., -1]
-    cmd_f = xp.sum(constants.KF * cmd_rotor_vel**2, axis=-1)
+    cmd_f = cmd[..., -1]
     cmd_rpy = cmd[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
