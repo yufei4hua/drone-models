@@ -52,7 +52,6 @@ def dynamics(
     cmd_rpy = cmd[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
-    rpy_rates = rotation.ang_vel2rpy_rates(quat, ang_vel)
 
     rotor_vel_dot = None
     thrust = constants.DI_ACC[0] + constants.DI_ACC[1] * cmd_f
@@ -68,12 +67,12 @@ def dynamics(
 
     # Rotational equation of motion
     quat_dot = rotation.ang_vel2quat_dot(quat, ang_vel)
+    rpy_rates = rotation.ang_vel2rpy_rates(quat, ang_vel)
     rpy_rates_dot = (
-        constants.DI_D_PARAMS[:, 0] * euler_angles
-        + constants.DI_D_PARAMS[:, 1] * rpy_rates
-        + constants.DI_D_PARAMS[:, 2] * cmd_rpy
+        constants.DI_PARAMS[:, 0] * euler_angles
+        + constants.DI_PARAMS[:, 1] * rpy_rates
+        + constants.DI_PARAMS[:, 2] * cmd_rpy
     )
-    rpy_rates_dot = xp.asarray(rpy_rates_dot)
     ang_vel_dot = rotation.rpy_rates_deriv2ang_vel_deriv(quat, rpy_rates, rpy_rates_dot)
     if dist_t is not None:
         # adding torque disturbances to the state
@@ -130,20 +129,12 @@ def dynamics_symbolic(
     )
     quat_dot = 0.5 * (xi @ symbols.quat)
     rpy_rates = rotation.cs_ang_vel2rpy_rates(symbols.quat, symbols.ang_vel)
-    if calc_rotor_vel:
-        rpy_rates_dot = (
-            constants.DI_D_PARAMS[:, 0] * euler_angles
-            + constants.DI_D_PARAMS[:, 1] * rpy_rates
-            + constants.DI_D_PARAMS[:, 2]
-            * cs.vertcat(symbols.cmd_roll, symbols.cmd_pitch, symbols.cmd_yaw)
-        )
-    else:
-        rpy_rates_dot = (
-            constants.DI_PARAMS[:, 0] * euler_angles
-            + constants.DI_PARAMS[:, 1] * rpy_rates
-            + constants.DI_PARAMS[:, 2]
-            * cs.vertcat(symbols.cmd_roll, symbols.cmd_pitch, symbols.cmd_yaw)
-        )
+    rpy_rates_dot = (
+        constants.DI_PARAMS[:, 0] * euler_angles
+        + constants.DI_PARAMS[:, 1] * rpy_rates
+        + constants.DI_PARAMS[:, 2]
+        * cs.vertcat(symbols.cmd_roll, symbols.cmd_pitch, symbols.cmd_yaw)
+    )
     ang_vel_dot = rotation.cs_rpy_rates_deriv2ang_vel_deriv(symbols.quat, rpy_rates, rpy_rates_dot)
     if calc_dist_t:
         # adding torque disturbances to the state

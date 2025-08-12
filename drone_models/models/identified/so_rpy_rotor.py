@@ -55,7 +55,6 @@ def dynamics(
     cmd_rpy = cmd[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
-    rpy_rates = rotation.ang_vel2rpy_rates(quat, ang_vel)
 
     if rotor_vel is None:
         rotor_vel_dot = None
@@ -81,12 +80,12 @@ def dynamics(
 
     # Rotational equation of motion
     quat_dot = rotation.ang_vel2quat_dot(quat, ang_vel)
+    rpy_rates = rotation.ang_vel2rpy_rates(quat, ang_vel)
     rpy_rates_dot = (
         constants.DI_D_PARAMS[:, 0] * euler_angles
         + constants.DI_D_PARAMS[:, 1] * rpy_rates
         + constants.DI_D_PARAMS[:, 2] * cmd_rpy
     )
-    rpy_rates_dot = xp.asarray(rpy_rates_dot)
     ang_vel_dot = rotation.rpy_rates_deriv2ang_vel_deriv(quat, rpy_rates, rpy_rates_dot)
     if dist_t is not None:
         # adding torque disturbances to the state
@@ -121,20 +120,18 @@ def dynamics_symbolic(
     if calc_dist_t:
         X = cs.vertcat(X, symbols.dist_t)
     U = cs.vertcat(symbols.cmd_roll, symbols.cmd_pitch, symbols.cmd_yaw, symbols.cmd_thrust)
+    cmd_rpy = cs.vertcat(symbols.cmd_roll, symbols.cmd_pitch, symbols.cmd_yaw)
 
     # Defining the dynamics function
     if calc_rotor_vel:
-        # Note: Due to the structure of the integrator, we split the commanded thrust into
-        # four equal parts and later apply the sum as total thrust again. Those four forces
-        # are not the true forces of the motors, but the sum is the true total thrust.
-        forces_motor_dot = 1 / constants.DI_D_ACC[2] * (symbols.cmd_thrust / 4 - symbols.rotor_vel)
-        thrust = cs.sum1(symbols.rotor_vel)
-        # Creating force vector
-        forces_motor_vec = cs.vertcat(0, 0, constants.DI_D_ACC[0] + constants.DI_D_ACC[1] * thrust)
+        # motor_force2rotor_speed
+        cmd_rotor_vel = cs.sqrt(symbols.cmd_thrust / 4 / constants.KF)
+        rotor_vel_dot = 1 / constants.DI_D_ACC[2] * (cmd_rotor_vel - symbols.rotor_vel)
+        thrust = constants.KF * cs.sum1(symbols.rotor_vel**2)
     else:
         thrust = symbols.cmd_thrust
-        # Creating force vector
-        forces_motor_vec = cs.vertcat(0, 0, constants.DI_ACC[0] + constants.DI_ACC[1] * thrust)
+    # Creating force vector
+    forces_motor_vec = cs.vertcat(0, 0, constants.DI_D_ACC[0] + constants.DI_D_ACC[1] * thrust)
 
     # Linear equation of motion
     pos_dot = symbols.vel
@@ -151,20 +148,11 @@ def dynamics_symbolic(
     )
     quat_dot = 0.5 * (xi @ symbols.quat)
     rpy_rates = rotation.cs_ang_vel2rpy_rates(symbols.quat, symbols.ang_vel)
-    if calc_rotor_vel:
-        rpy_rates_dot = (
-            constants.DI_D_PARAMS[:, 0] * euler_angles
-            + constants.DI_D_PARAMS[:, 1] * rpy_rates
-            + constants.DI_D_PARAMS[:, 2]
-            * cs.vertcat(symbols.cmd_roll, symbols.cmd_pitch, symbols.cmd_yaw)
-        )
-    else:
-        rpy_rates_dot = (
-            constants.DI_PARAMS[:, 0] * euler_angles
-            + constants.DI_PARAMS[:, 1] * rpy_rates
-            + constants.DI_PARAMS[:, 2]
-            * cs.vertcat(symbols.cmd_roll, symbols.cmd_pitch, symbols.cmd_yaw)
-        )
+    rpy_rates_dot = (
+        constants.DI_D_PARAMS[:, 0] * euler_angles
+        + constants.DI_D_PARAMS[:, 1] * rpy_rates
+        + constants.DI_D_PARAMS[:, 2] * cmd_rpy
+    )
     ang_vel_dot = rotation.cs_rpy_rates_deriv2ang_vel_deriv(symbols.quat, rpy_rates, rpy_rates_dot)
     if calc_dist_t:
         # adding torque disturbances to the state
@@ -178,7 +166,7 @@ def dynamics_symbolic(
         ang_vel_dot = constants.J_INV @ torque
 
     if calc_rotor_vel:
-        X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot, forces_motor_dot)
+        X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot)
     else:
         X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot)
     Y = cs.vertcat(symbols.pos, symbols.quat)

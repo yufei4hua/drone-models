@@ -11,45 +11,10 @@ from typing import TYPE_CHECKING
 
 import casadi as cs
 from array_api_compat import array_namespace
-from jax.scipy.spatial.transform import Rotation as JR
 from scipy.spatial.transform import Rotation as R
 
 if TYPE_CHECKING:
     from array_api_strict import Array
-
-
-def from_quat(quat: Array, scalar_first: bool = False) -> R:
-    """Creates a rotation object compatible with the type of the given quat."""
-    if isinstance(quat, jp.ndarray):
-        if scalar_first:
-            raise ValueError("scalar_first is not supported by jax rotations")
-        return JR.from_quat(quat)
-    else:
-        return R.from_quat(quat, scalar_first=scalar_first)
-
-
-def from_rotvec(rotvec: Array, degrees: bool = False) -> R:
-    """Creates a rotation object compatible with the type of the given rotvec."""
-    if isinstance(rotvec, jp.ndarray):
-        return JR.from_rotvec(rotvec, degrees)
-    else:
-        return R.from_rotvec(rotvec, degrees)
-
-
-def from_euler(seq: str, angles: Array, degrees: bool = False) -> R:
-    """Creates a rotation object compatible with the type of the given angles."""
-    if isinstance(angles, jp.ndarray):
-        return JR.from_euler(seq, angles, degrees)
-    else:
-        return R.from_euler(seq, angles, degrees)
-
-
-def from_matrix(matrix: Array) -> R:
-    """Creates a rotation objecte compatible with the type of the given rotation matrix."""
-    if isinstance(matrix, jp.ndarray):
-        return JR.from_matrix(matrix)
-    else:
-        return R.from_matrix(matrix)
 
 
 def ang_vel2quat_dot(quat: Array, ang_vel: Array) -> Array:
