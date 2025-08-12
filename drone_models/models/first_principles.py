@@ -102,7 +102,7 @@ def dynamics(
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
 
-def dynamics_sybolic(
+def dynamics_symbolic(
     constants: Constants,
     calc_rotor_vel: bool = True,
     calc_dist_f: bool = False,
@@ -123,8 +123,8 @@ def dynamics_sybolic(
     if calc_rotor_vel:
         # Thrust dynamics
         rotor_vel_dot = (
-            1 / constants.ROTOR_TAU * (U - symbols.rotor_vel)
-            - 1 / constants.ROTOR_D * symbols.rotor_vel**2
+            1 / constants.THRUST_TAU * (U - symbols.rotor_vel)
+            - 1 / constants.KM * symbols.rotor_vel**2
         )
         forces_motor = constants.KF * symbols.rotor_vel**2
     else:

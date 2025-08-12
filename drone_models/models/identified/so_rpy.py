@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import casadi as cs
 from array_api_compat import array_namespace
 from scipy.spatial.transform import Rotation as R
 
+import drone_models.models.symbols as symbols
 from drone_models.models.utils import supports
 from drone_models.utils import rotation
 
@@ -87,10 +89,74 @@ def dynamics(
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
 
-def dynamics_symbolic():
-    """Symbolic dynamics of the fitted double integrator (DI) model.
+def dynamics_symbolic(
+    constants: Constants,
+    calc_rotor_vel: bool = False,
+    calc_dist_f: bool = False,
+    calc_dist_t: bool = False,
+) -> tuple[cs.MX, cs.MX, cs.MX, cs.MX]:
+    """The fitted double integrator (DI) model with optional motor delay (D).
 
-    Returns:
-        The symbolic derivatives of all state variables.
+    TODO.
     """
-    ...
+    # States and Inputs
+    X = cs.vertcat(symbols.pos, symbols.quat, symbols.vel, symbols.ang_vel)
+    if calc_rotor_vel:
+        X = cs.vertcat(X, symbols.rotor_vel)
+    if calc_dist_f:
+        X = cs.vertcat(X, symbols.dist_f)
+    if calc_dist_t:
+        X = cs.vertcat(X, symbols.dist_t)
+    U = cs.vertcat(symbols.cmd_roll, symbols.cmd_pitch, symbols.cmd_yaw, symbols.cmd_thrust)
+
+    # Defining the dynamics function
+    # Creating force vector
+    forces_motor_vec = cs.vertcat(
+        0, 0, constants.DI_ACC[0] + constants.DI_ACC[1] * symbols.cmd_thrust
+    )
+
+    # Linear equation of motion
+    pos_dot = symbols.vel
+    vel_dot = symbols.rot @ forces_motor_vec / constants.MASS + constants.GRAVITY_VEC
+    if calc_dist_f:
+        # Adding force disturbances to the state
+        vel_dot = vel_dot + symbols.dist_f / constants.MASS
+
+    # Rotational equation of motion
+    euler_angles = rotation.cs_quat2euler(symbols.quat)
+
+    xi = cs.vertcat(
+        cs.horzcat(0, -symbols.ang_vel.T), cs.horzcat(symbols.ang_vel, -cs.skew(symbols.ang_vel))
+    )
+    quat_dot = 0.5 * (xi @ symbols.quat)
+    rpy_rates = rotation.cs_ang_vel2rpy_rates(symbols.quat, symbols.ang_vel)
+    if calc_rotor_vel:
+        rpy_rates_dot = (
+            constants.DI_D_PARAMS[:, 0] * euler_angles
+            + constants.DI_D_PARAMS[:, 1] * rpy_rates
+            + constants.DI_D_PARAMS[:, 2]
+            * cs.vertcat(symbols.cmd_roll, symbols.cmd_pitch, symbols.cmd_yaw)
+        )
+    else:
+        rpy_rates_dot = (
+            constants.DI_PARAMS[:, 0] * euler_angles
+            + constants.DI_PARAMS[:, 1] * rpy_rates
+            + constants.DI_PARAMS[:, 2]
+            * cs.vertcat(symbols.cmd_roll, symbols.cmd_pitch, symbols.cmd_yaw)
+        )
+    ang_vel_dot = rotation.cs_rpy_rates_deriv2ang_vel_deriv(symbols.quat, rpy_rates, rpy_rates_dot)
+    if calc_dist_t:
+        # adding torque disturbances to the state
+        # angular acceleration can be converted to total torque
+        torque = constants.J @ ang_vel_dot - cs.cross(
+            symbols.ang_vel, constants.J @ symbols.ang_vel
+        )
+        # adding torque
+        torque = torque + symbols.dist_t
+        # back to angular acceleration
+        ang_vel_dot = constants.J_INV @ torque
+
+    X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot)
+    Y = cs.vertcat(symbols.pos, symbols.quat)
+
+    return X_dot, X, U, Y
