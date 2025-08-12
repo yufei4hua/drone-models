@@ -163,10 +163,10 @@ class Constants:
         """
         match config:
             case "cf2x_L250":
-                return Constants.from_file("data/cf2x_L250.xml", xp)
+                return Constants.from_file("models/data/cf2x_L250.xml", xp)
             case "cf2x_P250":
-                return Constants.from_file("data/cf2x_P250.xml", xp)
+                return Constants.from_file("models/data/cf2x_P250.xml", xp)
             case "cf2x_T350":
-                return Constants.from_file("data/cf2x_T350.xml", xp)
+                return Constants.from_file("models/data/cf2x_T350.xml", xp)
             case _:
                 raise ValueError(f"Drone config '{config}' is not supported")

@@ -28,8 +28,6 @@ def supports(rotor_dynamics: bool = True) -> Callable[[F], F]:
         ) -> tuple[Array, Array, Array, Array, Array | None]:
             if not rotor_dynamics and rotor_vel is not None:
                 raise ValueError("Rotor dynamics not supported, but rotor_vel is provided.")
-            if rotor_dynamics and rotor_vel is None:
-                raise ValueError("Rotor dynamics supported, but rotor_vel is not provided.")
             return fn(pos, quat, vel, ang_vel, cmd, constants, rotor_vel, dist_f, dist_t)
 
         wrapper.__drone_model_features__ = {"rotor_dynamics": rotor_dynamics}

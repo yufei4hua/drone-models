@@ -29,9 +29,12 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/readline-8.2-h8c095d6_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/tk-8.6.13-noxft_hd72426e_102.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2025b-h78e105d_0.conda
+      - pypi: git+https://github.com/data-apis/array-api-typing#7dad73b066aabc6eb876ff593d77158b3e1a6837
       - pypi: https://files.pythonhosted.org/packages/e0/b1/0542e0cab6f49f151a2d7a42400f84f706fc0b64e85dc1f56708b2e9fd37/array_api_compat-1.12.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/bc/da/693816d1b09287c95425846b9009daf70968e72aaadf65ccb6b79a2b1626/array_api_extra-0.8.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/1d/0f/571b2c7a3833ae419fe69ff7b479a78d313581785203cc70a8db90121b9a/numpy-2.3.2-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: git+https://github.com/scipy/scipy.git?rev=0f2342f#0f2342f34cc850e7137a74afd33c6877c1c790e6
+      - pypi: https://files.pythonhosted.org/packages/b5/00/d631e67a838026495268c2f6884f3711a15a9a2a96cd244fdaea53b823fb/typing_extensions-4.14.1-py3-none-any.whl
       - pypi: ./
   test:
     channels:
@@ -62,7 +65,9 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/readline-8.2-h8c095d6_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/tk-8.6.13-noxft_hd72426e_102.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2025b-h78e105d_0.conda
+      - pypi: git+https://github.com/data-apis/array-api-typing#7dad73b066aabc6eb876ff593d77158b3e1a6837
       - pypi: https://files.pythonhosted.org/packages/e0/b1/0542e0cab6f49f151a2d7a42400f84f706fc0b64e85dc1f56708b2e9fd37/array_api_compat-1.12.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/bc/da/693816d1b09287c95425846b9009daf70968e72aaadf65ccb6b79a2b1626/array_api_extra-0.8.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e1/7b/81bef4348db9705d829c58b9e563c78eddca24438f1ce1108d709e6eed55/array_api_strict-2.4.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/96/9e/16bc0b59ca73b47b82380c0ac6ef5084fb0f6e487d24eb102926456708eb/casadi-3.7.1-cp313-none-manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/ea/2f/6ae1db51dc34db499bfe340e89f79a63bd115fc32513a7bacdf17d33cd86/coverage-7.10.3-cp313-cp313-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl
@@ -154,12 +159,25 @@ packages:
   - sparse>=0.15.1 ; extra == 'dev'
   - ndonnx ; extra == 'dev'
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/bc/da/693816d1b09287c95425846b9009daf70968e72aaadf65ccb6b79a2b1626/array_api_extra-0.8.0-py3-none-any.whl
+  name: array-api-extra
+  version: 0.8.0
+  sha256: 6833bbd9aa6b5d6ead44a4dddceed54f9320510f94e30aef8524b198ae2870d8
+  requires_dist:
+  - array-api-compat>=1.12.0,<2
+  requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/e1/7b/81bef4348db9705d829c58b9e563c78eddca24438f1ce1108d709e6eed55/array_api_strict-2.4.1-py3-none-any.whl
   name: array-api-strict
   version: 2.4.1
   sha256: 22198ceb47cd3d9c0534c50650d265848d0da6ff71707171215e6678ce811ca5
   requires_dist:
   - numpy
+  requires_python: '>=3.10'
+- pypi: git+https://github.com/data-apis/array-api-typing#7dad73b066aabc6eb876ff593d77158b3e1a6837
+  name: array-api-typing
+  version: 0.1.dev26+g7dad73b06
+  requires_dist:
+  - typing-extensions>=4.14.1
   requires_python: '>=3.10'
 - conda: https://conda.anaconda.org/conda-forge/linux-64/bzip2-1.0.8-h4bc722e_7.conda
   sha256: 5ced96500d945fb286c9c838e54fa759aa04a7129c59800f0846b4335cee770d
@@ -197,11 +215,13 @@ packages:
 - pypi: ./
   name: drone-models
   version: 0.0.1
-  sha256: 092988630bf78b2e088cc3f11c9d2c68ff8a3bd943c23c609272809ff2e25aec
+  sha256: 4f4fa5683ce086b0208e8a2a9423a63b7b5fa812c48538ab5005b37db725a89a
   requires_dist:
   - numpy>=2.0.0
   - array-api-compat
   - scipy @ git+https://github.com/scipy/scipy.git@0f2342f
+  - array-api-typing @ git+https://github.com/data-apis/array-api-typing
+  - array-api-extra
   - pytest>=8.0.0 ; extra == 'test'
   - pytest-cov ; extra == 'test'
   - pytest-timeout ; extra == 'test'

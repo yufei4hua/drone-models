@@ -32,16 +32,16 @@ def dynamics(
     """The fitted double integrator (DI) model with optional motor delay (D).
 
     Args:
-        pos (Array): Position of the drone (m)
-        quat (Array): Quaternion of the drone (xyzw)
-        vel (Array): Velocity of the drone (m/s)
-        ang_vel (Array): Angular velocity of the drone (rad/s)
-        cmd (Array): RPYT command (roll, pitch, yaw in rad, thrust in N)
-        constants (Constants): Containing the constants of the drone
-        rotor_vel (Array | None, optional): Speed of the 4 motors in rad/s. Defaults to None.
-            If None, the commanded thrust is directly applied. If value is given, thrust dynamics are calculated.
-        dist_f: Disturbance force acting on the CoM. Defaults to None.
-        dist_t: Disturbance torque acting on the CoM. Defaults to None.
+        pos: Position of the drone (m).
+        quat: Quaternion of the drone (xyzw).
+        vel: Velocity of the drone (m/s).
+        ang_vel: Angular velocity of the drone (rad/s).
+        cmd: Roll pitch yaw (rad) and collective thrust (N) command.
+        constants: Containing the constants of the drone.
+        rotor_vel: Speed of the 4 motors (rad/s). If None, the commanded thrust is directly
+            applied. If value is given, rotor dynamics are calculated.
+        dist_f: Disturbance force acting on the CoM (N).
+        dist_t: Disturbance torque acting on the CoM (Nm).
 
     Returns:
         tuple[Array, Array, Array, Array, Array | None]: _description_
@@ -53,6 +53,15 @@ def dynamics(
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
     rpy_rates = rotation.ang_vel2rpy_rates(quat, ang_vel)
+
+    if rotor_vel is None:
+        rotor_vel_dot = None
+        rotor_vel = xp.asarray(cmd_rotor_vel)
+    else:
+        rotor_vel_dot = (
+            1 / constants.ROTOR_TAU * (cmd_rotor_vel - rotor_vel)
+            - 1 / constants.ROTOR_D * rotor_vel**2
+        )
 
     # Note: Due to the structure of the integrator, we split the commanded thrust into
     # four equal parts and later apply the sum as total thrust again. Those four forces

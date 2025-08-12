@@ -2,21 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import array_api_compat.numpy as np
 import array_api_strict as xp
 import jax
 import jax.numpy as jp
-
-# import numpy as np
 import pytest
 
-from drone_models.models import available_models, dynamic_numeric_from_symbolic, dynamics_numeric
+from drone_models.models import available_models, model_features
 from drone_models.utils.constants import Constants
 
 if TYPE_CHECKING:
-    from array_api_strict import Array
+    from array_api_typing import Array
 
 # For all tests to pass, we need the same precsion in jax as in np
 jax.config.update("jax_enable_x64", True)
@@ -30,10 +28,10 @@ def create_rnd_states(N: int = 1000) -> tuple[Array, Array, Array, Array, Array,
     quat = xp.asarray(np.random.uniform(-1, 1, (N, 4)))  # Libraries normalize automatically
     vel = xp.asarray(np.random.uniform(-5, 5, (N, 3)))
     ang_vel = xp.asarray(np.random.uniform(-2, 2, (N, 3)))
-    forces_motor = xp.asarray(np.random.uniform(0, 0.2, (N, 4)))
+    rotor_vel = xp.asarray(np.random.uniform(0, 0.2, (N, 4)))
     forces_dist = xp.asarray(np.random.uniform(-0.2, 0.2, (N, 3)))
     torques_dist = xp.asarray(np.random.uniform(-0.05, 0.05, (N, 3)))
-    return pos, quat, vel, ang_vel, forces_motor, forces_dist, torques_dist
+    return pos, quat, vel, ang_vel, rotor_vel, forces_dist, torques_dist
 
 
 def create_rnd_commands(N: int = 1000, dim: int = 4) -> Array:
@@ -41,21 +39,70 @@ def create_rnd_commands(N: int = 1000, dim: int = 4) -> Array:
     return xp.asarray(np.random.uniform(0, 0.2, (N, dim)))
 
 
+def skip_models_without_features(model: Callable, features: list[str]):
+    """Skip the model if it does not have the required features."""
+    for feature in model_features(model):
+        if feature not in features:
+            pytest.skip(f"Model {model.__name__} does not have the required features.")
+
+
 @pytest.mark.unit
-@pytest.mark.parametrize("model", available_models.keys())
+@pytest.mark.parametrize("model_name, model", available_models.items())
+def test_model_features(model_name: str, model: Callable):
+    """Tests if the model features are correctly set."""
+    assert hasattr(model, "__drone_model_features__"), (
+        f"Model function {model_name} does not have __drone_model_features__ attribute"
+    )
+    features = getattr(model, "__drone_model_features__")
+    assert isinstance(features, dict), (
+        f"__drone_model_features__ should be a dict, got {type(features)} for {model_name}"
+    )
+    assert "rotor_dynamics" in features, (
+        f"__drone_model_features__ should contain 'rotor_dynamics' key for {model_name}"
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("model_name, model", available_models.items())
+@pytest.mark.parametrize("drone_name", Constants.available_configs)
+@pytest.mark.parametrize("rotor_dynamics", [False, True])
+def test_model_single_input(
+    model_name: str, model: Callable, drone_name: str, rotor_dynamics: bool
+):
+    if rotor_dynamics:
+        skip_models_without_features(model, ["rotor_dynamics"])
+
+    pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states(1)
+    if not rotor_dynamics:
+        rotor_vel = None
+    commands = create_rnd_commands(1, 4)  # TODO make dependent on model
+    x_dot = model(
+        pos[0, ...],
+        quat[0, ...],
+        vel[0, ...],
+        ang_vel[0, ...],
+        commands[0, ...],
+        Constants.from_config(drone_name, xp),
+        rotor_vel=rotor_vel[0, ...] if rotor_vel is not None else None,
+    )
+    x_dot = xp.concat([x for x in x_dot if x is not None])
+    assert x_dot.shape == (13,)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("model_name, model", available_models.items())
 @pytest.mark.parametrize("config", Constants.available_configs)
-def test_symbolic2numeric(model: str, config: str):
-    """Tests if casadi numeric prediction is the same as the numpy one."""
-    pos, quat, vel, ang_vel, forces_motor, _, _ = create_rnd_states((N))
-    if model == "fitted_DI_rpyt":
-        forces_motor = None
+def test_symbolic2numeric(model_name: str, model: Callable, config: str):
+    pos, quat, vel, ang_vel, forces_motor, _, _ = create_rnd_states(N)
     commands = create_rnd_commands(N, 4)  # TODO make dependent on model
+
+    symbolic_model = symbolic_model(model)
 
     f_numeric = dynamics_numeric(model, config, xp)
     f_symbolic2numeric = dynamic_numeric_from_symbolic(model, config)
 
     for i in range(N):  # casadi only supports non batched calls
-        x_dot_numeric = f_numeric(
+        x_dot = model(
             pos[i, ...],
             quat[i, ...],
             vel[i, ...],
@@ -63,11 +110,7 @@ def test_symbolic2numeric(model: str, config: str):
             commands[i, ...],
             forces_motor=forces_motor[i, ...] if forces_motor is not None else None,
         )
-        print(x_dot_numeric)
-        if forces_motor is not None:
-            x_dot_numeric = xp.concat(x_dot_numeric)
-        else:
-            x_dot_numeric = xp.concat(x_dot_numeric[:-1])
+        x_dot = xp.concat([x for x in x_dot if x is not None])
 
         if forces_motor is not None:
             X = xp.concat(
@@ -77,11 +120,8 @@ def test_symbolic2numeric(model: str, config: str):
             X = xp.concat((pos[i, ...], quat[i, ...], vel[i, ...], ang_vel[i, ...]))
 
         U = commands[i, ...]
-        print(X.shape, U.shape)
         x_dot_symbolic2numeric = xp.asarray(f_symbolic2numeric(X._array, U._array))
         x_dot_symbolic2numeric = xp.squeeze(x_dot_symbolic2numeric, axis=-1)
-        print(f"i={i}, diff={x_dot_numeric - x_dot_symbolic2numeric}")
-        print(f"{x_dot_numeric=}, {x_dot_symbolic2numeric=}")
         assert np.allclose(x_dot_numeric, x_dot_symbolic2numeric), (
             "Symbolic and numeric model have different output"
         )

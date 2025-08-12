@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import array_api_extra as xpx
 import casadi as cs
 from array_api_compat import array_namespace
 from scipy.spatial.transform import Rotation as R
 
 import drone_models.models.symbols as symbols
+from drone_models.models.utils import supports
+from drone_models.transform import motor_force2rotor_speed
 from drone_models.utils import rotation
 
 if TYPE_CHECKING:
@@ -17,6 +20,7 @@ if TYPE_CHECKING:
     from drone_models.utils.constants import Constants
 
 
+@supports(rotor_dynamics=True)
 def dynamics(
     pos: Array,
     quat: Array,
@@ -35,16 +39,16 @@ def dynamics(
     Based on the quaternion model from https://www.dynsyslab.org/wp-content/papercite-data/pdf/mckinnon-robot20.pdf
 
     Args:
-        pos: Position of the drone (m)
-        quat: Quaternion of the drone (xyzw)
-        vel: Velocity of the drone (m/s)
-        ang_vel: Angular velocity of the drone (rad/s)
-        cmd: RPYT command (roll, pitch, yaw in rad, thrust in N)
-        constants: Containing the constants of the drone
-        rotor_vel: Angular velocity of the 4 motors (rad/s). Defaults to None.
-            If None, the commanded thrust is directly applied. If value is given, thrust dynamics are calculated.
-        dist_f: Disturbance force acting on the CoM. Defaults to None.
-        dist_t: Disturbance torque acting on the CoM. Defaults to None.
+        pos: Position of the drone (m).
+        quat: Quaternion of the drone (xyzw).
+        vel: Velocity of the drone (m/s).
+        ang_vel: Angular velocity of the drone (rad/s).
+        cmd: Roll pitch yaw (rad) and collective thrust (N) command.
+        constants: Containing the constants of the drone.
+        rotor_vel: Angular velocity of the 4 motors (rad/s). If None, the commanded thrust is
+            directly applied. If value is given, thrust dynamics are calculated.
+        dist_f: Disturbance force acting on the CoM (N).
+        dist_t: Disturbance torque acting on the CoM (Nm).
 
     .. math::
         \sum_{i=1}^{\\infty} x_{i} TODO
@@ -56,10 +60,12 @@ def dynamics(
     """
     xp = array_namespace(pos)
     rot = R.from_quat(quat)
-    # Thrust dynamics
+    # Rotor dynamics
     if rotor_vel is None:
         rotor_vel_dot = None
-        rotor_vel = cmd
+        rotor_vel = xpx.at(xp.empty_like(cmd))[...].set(
+            motor_force2rotor_speed(cmd[..., -1] / 4, constants.KF)
+        )
     else:
         rotor_vel_dot = (
             1 / constants.ROTOR_TAU * (cmd - rotor_vel) - 1 / constants.ROTOR_D * rotor_vel**2
@@ -76,10 +82,8 @@ def dynamics(
     torques_motor_vec = xp.matmul(forces_motor, constants.SIGN_MATRIX) * xp.stack(
         [constants.L, constants.L, constants.KM / constants.KF]
     )
-
     # Linear equation of motion
     forces_motor_vec_world = rot.apply(forces_motor_vec)
-
     force_world_frame = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
     if dist_f is not None:
         force_world_frame = force_world_frame + dist_f
@@ -97,7 +101,7 @@ def dynamics(
         torques - xp.linalg.cross(ang_vel, xp.matmul(ang_vel, xp.asarray(constants.J).T)),
         xp.asarray(constants.J_INV).T,
     )
-
+    print(pos_dot.shape, quat_dot.shape, vel_dot.shape, ang_vel_dot.shape)
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
 

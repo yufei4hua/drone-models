@@ -17,6 +17,8 @@ dependencies = [
     "numpy>=2.0.0",
     "array-api-compat",
     "scipy @ git+https://github.com/scipy/scipy.git@0f2342f",  # TODO: Replace with scipy 1.17 once released
+    "array-api-typing @ git+https://github.com/data-apis/array-api-typing",  # TODO: Replace with array-api-typing from pip once released
+    "array-api-extra",
 ]
 
 [project.optional-dependencies]
@@ -101,3 +103,5 @@ drone_models = { path = ".", editable = true }
 [tool.pixi.environments]
 default = { solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
+
+[tool.pixi.dependencies]
