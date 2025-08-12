@@ -1,4 +1,4 @@
-name: Testing 
+name: Testing
 
 on: [push]
 
@@ -8,28 +8,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Pixi
-        uses: actions/cache@v4
+      # Restore Pixi cache
+      - name: Restore Pixi cache
+        id: pixi-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             $HOME/.pixi/envs
             $HOME/.pixi/pkgs
             $HOME/.pixi/indices
           key: ${{ runner.os }}-pixi-${{ hashFiles('pyproject.toml') }}
-          restore-keys: ${{ runner.os }}-pixi-
+          restore-keys: |
+            ${{ runner.os }}-pixi-
 
+      # Install Pixi
       - name: Install Pixi
         run: |
           curl -fsSL https://pixi.sh/install.sh | bash
           echo "$HOME/.pixi/bin" >> $GITHUB_PATH
-          $HOME/.pixi/bin/pixi --version
+          pixi --version
 
+      # Install dependencies
       - name: Install test environment
-        run: $HOME/.pixi/bin/pixi install -e test
+        run: pixi install -e test --locked || pixi install -e test
 
+      # Run tests (may fail)
       - name: Run tests
-        run: $HOME/.pixi/bin/pixi run -e test python -m pytest
+        run: pixi run -e test python -m pytest
 
+      # Save Pixi cache even if tests fail
       - name: Save Pixi cache
         if: always()
         uses: actions/cache/save@v4
