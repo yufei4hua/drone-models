@@ -5,14 +5,17 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING, NamedTuple, Type
 
 if TYPE_CHECKING:
     from array_api_compat.typing import Array
 
+# Configs (used in testing)
+available_configs: tuple = ("cf2x_L250", "cf2x_P250", "cf2x_T350")
 
-@dataclass
-class Constants:
+
+# @dataclass(frozen=True)
+class Constants(NamedTuple):
     """This is a dataclass for all necessary constants in the models."""
 
     GRAVITY: float
@@ -57,9 +60,6 @@ class Constants:
     DI_DD_YAW: Array
     DI_DD_PARAMS: Array
     DI_DD_ACC: Array
-
-    # Configs (used in testing)
-    available_configs: tuple = ("cf2x_L250", "cf2x_P250", "cf2x_T350")
 
     @classmethod
     def from_file(cls, path: str, xp: Type[Array]) -> Constants:

@@ -15,7 +15,7 @@ import pytest
 from array_api_compat import device as xp_device
 
 from drone_models.models import available_models, model_features
-from drone_models.utils.constants import Constants
+from drone_models.utils.constants import Constants, available_configs
 
 if TYPE_CHECKING:
     from array_api_typing import Array
@@ -68,7 +68,7 @@ def test_model_features(model_name: str, model: Callable):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_name", Constants.available_configs)
+@pytest.mark.parametrize("drone_name", available_configs)
 def test_model_single_no_rotor_dynamics(model_name: str, model: Callable, drone_name: str):
     pos, quat, vel, ang_vel, _, _, _ = create_rnd_states()
     cmd = create_rnd_commands(dim=4)  # TODO make dependent on model
@@ -91,7 +91,7 @@ def test_model_single_no_rotor_dynamics(model_name: str, model: Callable, drone_
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_name", Constants.available_configs)
+@pytest.mark.parametrize("drone_name", available_configs)
 def test_model_single_rotor_dynamics(model_name: str, model: Callable, drone_name: str):
     skip_models_without_features(model, ["rotor_dynamics"])
 
@@ -111,7 +111,7 @@ def test_model_single_rotor_dynamics(model_name: str, model: Callable, drone_nam
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_name", Constants.available_configs)
+@pytest.mark.parametrize("drone_name", available_configs)
 def test_model_single_external_wrench(model_name: str, model: Callable, drone_name: str):
     pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t = create_rnd_states()
     if not model_features(model)["rotor_dynamics"]:
@@ -137,7 +137,7 @@ def test_model_single_external_wrench(model_name: str, model: Callable, drone_na
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_name", Constants.available_configs)
+@pytest.mark.parametrize("drone_name", available_configs)
 def test_model_batched_no_rotor_dynamics(model_name: str, model: Callable, drone_name: str):
     batch_shape = (10,)
     pos, quat, vel, ang_vel, _, _, _ = create_rnd_states(batch_shape)
@@ -161,7 +161,7 @@ def test_model_batched_no_rotor_dynamics(model_name: str, model: Callable, drone
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_name", Constants.available_configs)
+@pytest.mark.parametrize("drone_name", available_configs)
 def test_model_batched_rotor_dynamics(model_name: str, model: Callable, drone_name: str):
     skip_models_without_features(model, ["rotor_dynamics"])
 
@@ -182,7 +182,7 @@ def test_model_batched_rotor_dynamics(model_name: str, model: Callable, drone_na
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_name", Constants.available_configs)
+@pytest.mark.parametrize("drone_name", available_configs)
 def test_model_batched_external_wrench(model_name: str, model: Callable, drone_name: str):
     batch_shape = (10,)
     pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t = create_rnd_states(batch_shape)
@@ -209,7 +209,7 @@ def test_model_batched_external_wrench(model_name: str, model: Callable, drone_n
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("config", Constants.available_configs)
+@pytest.mark.parametrize("config", available_configs)
 def test_symbolic2numeric_no_external_wrench(model_name: str, model: Callable, config: str):
     batch_shape = (10,)
     pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states(batch_shape)
@@ -262,7 +262,7 @@ def test_symbolic2numeric_no_external_wrench(model_name: str, model: Callable, c
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("config", Constants.available_configs)
+@pytest.mark.parametrize("config", available_configs)
 def test_symbolic2numeric_external_wrench(model_name: str, model: Callable, config: str):
     batch_shape = (10,)
     pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t = create_rnd_states(batch_shape)
@@ -333,7 +333,7 @@ def test_symbolic2numeric_external_wrench(model_name: str, model: Callable, conf
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("config", Constants.available_configs)
+@pytest.mark.parametrize("config", available_configs)
 def test_numeric_batching(model_name: str, model: Callable, config: str):
     """Tests if batching works and if the results are identical to the non-batched version."""
     batch_shape = (10,)
@@ -381,7 +381,7 @@ def test_numeric_batching(model_name: str, model: Callable, config: str):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("config", Constants.available_configs)
+@pytest.mark.parametrize("config", available_configs)
 def test_numeric_jit(model_name: str, model: Callable, config: str):
     """Tests if the models are jitable and if the results are identical to the array API ones."""
     batch_shape = (10,)
@@ -408,9 +408,7 @@ def test_numeric_jit(model_name: str, model: Callable, config: str):
         jprotor_vel = jp.asarray(rotor_vel._array)
     jpcmd = jp.asarray(cmd._array)
 
-    model = partial(model, constants=Constants.from_config(config, jp))
     model_jit = jax.jit(model)
-    # TODO maybe remove the partial https://stackoverflow.com/questions/79114391/jit-partial-or-with-static-argnums-non-hashable-input-but-hashable-partial
 
     jp_dot = model_jit(
         jppos,
@@ -418,6 +416,7 @@ def test_numeric_jit(model_name: str, model: Callable, config: str):
         jpvel,
         jpang_vel,
         jpcmd,
+        Constants.from_config(config, jp),
         rotor_vel=jprotor_vel if jprotor_vel is not None else None,
     )
 
