@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple, Type
+from typing import TYPE_CHECKING, NamedTuple
+
+from array_api_compat import numpy as np
 
 if TYPE_CHECKING:
+    from types import ModuleType
+
     from array_api_typing import Array
 
 # Configs (used in testing)
@@ -59,12 +63,13 @@ class Constants(NamedTuple):
     DI_DD_PARAMS: Array
     DI_DD_ACC: Array
 
-    @classmethod
-    def from_file(cls, path: str, xp: Type[Array]) -> Constants:
+    @staticmethod
+    def from_file(path: Path, xp: ModuleType | None = None) -> Constants:
         """Creates constants based on the xml file at the given location.
 
         The constants are supposed to be under the costum/numeric category.
         """
+        xp = np if xp is None else xp
         # Constants
         drone_path = Path(__file__).parents[1] / path
         # read in all parameters from xml
@@ -116,7 +121,7 @@ class Constants(NamedTuple):
         DI_DD_PARAMS = xp.stack((DI_DD_ROLL, DI_DD_PITCH, DI_DD_YAW), axis=0)
         DI_DD_ACC = params["DI_DD_acc"]
 
-        return cls(
+        return Constants(
             GRAVITY,
             GRAVITY_VEC,
             MASS,
@@ -153,12 +158,13 @@ class Constants(NamedTuple):
             DI_DD_ACC,
         )
 
-    @classmethod
-    def from_config(cls, config: str, xp: Type[Array]) -> Constants:
+    @staticmethod
+    def from_config(config: str, xp: ModuleType | None = None) -> Constants:
         """Creates constants based on the give configuration.
 
         For available configs see Constants.available_configs
         """
+        xp = np if xp is None else xp
         match config:
             case "cf2x_L250":
                 return Constants.from_file("models/data/cf2x_L250.xml", xp)
