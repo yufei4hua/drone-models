@@ -252,7 +252,7 @@ def test_symbolic2numeric_no_external_wrench(model_name: str, model: Callable, c
             )
 
         U = cmd[i + (...,)]
-        x_dot_symbolic2numeric = xp.asarray(model_symbolic2numeric(X._array, U._array))
+        x_dot_symbolic2numeric = xp.asarray(model_symbolic2numeric(np.asarray(X), np.asarray(U)))
         x_dot_symbolic2numeric = xp.squeeze(x_dot_symbolic2numeric, axis=-1)
         assert np.allclose(x_dot, x_dot_symbolic2numeric), (
             "Symbolic and numeric model have different output"
@@ -320,11 +320,8 @@ def test_symbolic2numeric_external_wrench(model_name: str, model: Callable, conf
             )
 
         U = cmd[i + (...,)]
-        x_dot_symbolic2numeric = xp.asarray(model_symbolic2numeric(X._array, U._array))
+        x_dot_symbolic2numeric = xp.asarray(model_symbolic2numeric(np.asarray(X), np.asarray(U)))
         x_dot_symbolic2numeric = xp.squeeze(x_dot_symbolic2numeric, axis=-1)
-        print(x_dot)
-        print(x_dot_symbolic2numeric)
-        print(x_dot - x_dot_symbolic2numeric)
         assert np.allclose(x_dot, x_dot_symbolic2numeric), (
             "Symbolic and numeric model have different output"
         )
@@ -368,7 +365,7 @@ def test_numeric_batching(model_name: str, model: Callable, config: str):
             constants,
             rotor_vel=rotor_vel[i + (...,)] if rotor_vel is not None else None,
         )
-        x_dot_non_batched = xp.concat([x for x in x_dot_non_batched if x is not None])
+        x_dot_non_batched = xp.concat([x for x in x_dot_non_batched if x is not None], axis=-1)
 
         assert np.allclose(x_dot_batched[i + (...,)], x_dot_batched_1[0, ...], atol=2e-8), (
             "Batching failed for batch size 1"
@@ -399,13 +396,13 @@ def test_numeric_jit(model_name: str, model: Callable, config: str):
         rotor_vel=rotor_vel if rotor_vel is not None else None,
     )
 
-    jppos, jpquat = jp.asarray(pos._array), jp.asarray(quat._array)
-    jpvel, jpang_vel = jp.asarray(vel._array), jp.asarray(ang_vel._array)
+    jppos, jpquat = jp.asarray(np.asarray(pos)), jp.asarray(np.asarray(quat))
+    jpvel, jpang_vel = jp.asarray(np.asarray(vel)), jp.asarray(np.asarray(ang_vel))
     if rotor_vel is None:
         jprotor_vel = None
     else:
-        jprotor_vel = jp.asarray(rotor_vel._array)
-    jpcmd = jp.asarray(cmd._array)
+        jprotor_vel = jp.asarray(np.asarray(rotor_vel))
+    jpcmd = jp.asarray(np.asarray(cmd))
 
     model_jit = jax.jit(model)
 
