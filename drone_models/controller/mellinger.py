@@ -5,11 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from array_api_compat import array_namespace
+from scipy.spatial.transform import Rotation as R
 
-import drone_models.utils.cf2 as cf2
-import drone_models.utils.rotation as R
+import drone_models.utils.rotation as rotation
 from drone_models.transform import force2pwm, motor_force2rotor_speed, pwm2force
-from drone_models.utils.constants_controllers import cntrl_const_mel
 
 if TYPE_CHECKING:
     from array_api_typing import Array
@@ -24,6 +23,7 @@ def pos2attitude(
     ang_vel: Array,
     cmd: Array,
     constants: Constants,
+    parameters: dict[str, Array | float],
     dt: float = 1 / 500,
     i_error: Array | None = None,
 ) -> tuple[Array, Array]:
@@ -44,6 +44,7 @@ def pos2attitude(
         cmd: Full state command in SI units and rad with shape (..., 13). The entries are
             [x, y, z, vx, vy, vz, ax, ay, az, yaw, roll_rate, pitch_rate, yaw_rate].
         constants: Drone specific constants.
+        parameters: Controller specific parameters. TODO make class?
         dt: Time since last call.
         i_error: Integral error of the position controller with shape (..., 3).
 
@@ -63,17 +64,15 @@ def pos2attitude(
     # l.151 ff Integral Error
     if i_error is None:
         i_error = xp.zeros_like(pos)
-    i_error = xp.clip(
-        i_error + r_error * dt, -cntrl_const_mel["i_range"], cntrl_const_mel["i_range"]
-    )
+    i_error = xp.clip(i_error + r_error * dt, -parameters["i_range"], parameters["i_range"])
     # l. 161 Desired thrust [F_des]
     # => only one case here, since setpoint is always in absolute mode
     # Note: since we've defined the gravity in z direction, a "-" needs to be added
     target_thrust = (
-        cntrl_const_mel["mass"] * (setpoint_acc - constants.GRAVITY_VEC)
-        + cntrl_const_mel["kp"] * r_error
-        + cntrl_const_mel["kd"] * v_error
-        + cntrl_const_mel["ki"] * i_error
+        parameters["mass"] * (setpoint_acc - constants.GRAVITY_VEC)
+        + parameters["kp"] * r_error
+        + parameters["kd"] * v_error
+        + parameters["ki"] * i_error
     )
     # l. 178 Rate-controlled YAW is moving YAW angle setpoint
     # => only one case here, since the setpoint is always in absolute mode
@@ -88,7 +87,7 @@ def pos2attitude(
     # Taking the dot product of the last axis:
     current_thrust = xp.vecdot(target_thrust, z_axis, axis=-1)
     # l. 207 Calculate axis [zB_des]
-    z_axis_desired = target_thrust / xp.linalg.norm(target_thrust)
+    z_axis_desired = target_thrust / xp.linalg.vector_norm(target_thrust)
     # l. 210 [xC_des]
     # x_axis_desired = z_axis_desired x [sin(yaw), cos(yaw), 0]^T
     x_c_des_x = xp.cos(desiredYaw)
@@ -97,16 +96,16 @@ def pos2attitude(
     x_c_des = xp.stack((x_c_des_x, x_c_des_y, x_c_des_z), axis=-1)
     # [yB_des]
     y_axis_desired = xp.linalg.cross(z_axis_desired, x_c_des)
-    y_axis_desired = y_axis_desired / xp.linalg.norm(y_axis_desired)
+    y_axis_desired = y_axis_desired / xp.linalg.vector_norm(y_axis_desired)
     # [xB_des]
     x_axis_desired = xp.linalg.cross(y_axis_desired, z_axis_desired)
     # converting desired axis to rotation matrix and then to RPY
     matrix = xp.stack((x_axis_desired, y_axis_desired, z_axis_desired), axis=-1)
     command_RPY = R.from_matrix(matrix).as_euler("xyz", degrees=False)
     # l. 283
-    thrust = cntrl_const_mel["massThrust"] * current_thrust
+    thrust = parameters["massThrust"] * current_thrust
     # Transform thrust into N to keep uniform interface
-    thrust = cf2.pwm2force(thrust, constants, perMotor=False)
+    thrust = pwm2force(thrust, constants.THRUST_MAX, constants.PWM_MAX) * 4
     command_rpyt = xp.concat((command_RPY, thrust[..., None]), axis=-1)
     return command_rpyt, i_error
 
@@ -116,8 +115,9 @@ def attitude2force_torque(
     quat: Array,
     vel: Array,
     ang_vel: Array,
-    command_rpyt: Array,
+    cmd: Array,
     constants: Constants,
+    parameters: dict[str, Array | float],
     dt: float = 1 / 500,
     i_error_m: Array | None = None,
     ang_vel_des: Array | None = None,
@@ -131,8 +131,9 @@ def attitude2force_torque(
         quat: Drone orientation as xyzw quaternion with shape (..., 4).
         vel: Drone velocity with shape (..., 3).
         ang_vel: Drone angular drone velocity in rad/s with shape (..., 3).
-        command_rpyt: Commanded attitude (roll, pitch, yaw) and total thrust [rad, rad, rad, N]
+        cmd: Commanded attitude (roll, pitch, yaw) and total thrust [rad, rad, rad, N]
         constants (Constants): Constants of the specific drone
+        parameters: Controller specific parameters. TODO make class?
         dt: Time since last call.
         i_error_m: Integral error.
         ang_vel_des: Desired angular velocity in rad/s.
@@ -142,10 +143,10 @@ def attitude2force_torque(
     Returns:
         4 Motor forces [N], i_error_m
     """
-    xp = array_namespace(pos)
-    force_des = command_rpyt[..., -1]  # Total thrust in N
-    rpy_des = command_rpyt[..., :-1]
-    axis_flip = xp.array([1, -1, 1])  # to change the direction of the y axis
+    xp = array_namespace(quat)
+    force_des = cmd[..., -1]  # Total thrust in N
+    rpy_des = cmd[..., -4:-1]
+    axis_flip = xp.asarray([1.0, -1.0, 1.0])  # to change the direction of the y axis
     # l. 220 ff [eR]. We're using the "inefficient" code path from the firmware
     rot = R.from_quat(quat)
     rot_des = R.from_euler("xyz", rpy_des, degrees=False)
@@ -174,16 +175,18 @@ def attitude2force_torque(
     if i_error_m is None:
         i_error_m = xp.zeros_like(pos)
     i_error_m = i_error_m - eR * dt
-    i_error_m = xp.clip(i_error_m, -cntrl_const_mel["i_range_m"], cntrl_const_mel["i_range_m"])
+    i_error_m = xp.clip(i_error_m, -parameters["i_range_m"], parameters["i_range_m"])
     # l. 278 ff Moment:
     torque_pwm = (
-        -cntrl_const_mel["kR"] * eR
-        + cntrl_const_mel["kw"] * ew
-        + cntrl_const_mel["ki_m"] * i_error_m
-        + cntrl_const_mel["kd_omega"] * err_d
+        -parameters["kR"] * eR
+        + parameters["kw"] * ew
+        + parameters["ki_m"] * i_error_m
+        + parameters["kd_omega"] * err_d
     )
     # l. 297 ff
-    torque_pwm = xp.clip(torque_pwm, -32_000, 32_000)
+    torque_pwm = xp.clip(
+        torque_pwm, -parameters["torque_pwm_range"], parameters["torque_pwm_range"]
+    )
     torque_pwm = xp.where((force_des > 0)[..., None], torque_pwm, 0.0)
     # Info: The following part is NOT part of the Mellinger controller, but of the firmware.
     # The mixing of force and torque is done on the PWM level. We therefore mix those here according

@@ -5,3 +5,15 @@ agnostic to the choice of framework and supports e.g. NumPy, JAX, or PyTorch. We
 controllers as pure functions to ensure that users can jit-compile them. All controllers use
 broadcasting to support batching of arbitrary leading dimensions.
 """
+
+from typing import Callable
+
+from drone_models.controller.mellinger import (
+    attitude2force_torque as mellinger_attitude2force_torque,
+)
+from drone_models.controller.mellinger import pos2attitude as mellinger_pos2attitude
+
+available_controller: dict[str, Callable] = {
+    "mellinger_pos2attitude": mellinger_pos2attitude,
+    "mellinger_attitude2force_torque": mellinger_attitude2force_torque,
+}
