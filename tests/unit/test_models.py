@@ -14,7 +14,7 @@ import pytest
 from array_api_compat import device as xp_device
 
 from drone_models.models import available_models, model_features
-from drone_models.utils.constants import Constants, available_configs
+from drone_models.utils.constants import Constants, available_drone_types
 
 if TYPE_CHECKING:
     from array_api_typing import Array
@@ -67,18 +67,18 @@ def test_model_features(model_name: str, model: Callable):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_name", available_configs)
-def test_model_single_no_rotor_dynamics(model_name: str, model: Callable, drone_name: str):
+@pytest.mark.parametrize("drone_type", available_drone_types)
+def test_model_single_no_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
     pos, quat, vel, ang_vel, _, _, _ = create_rnd_states()
     cmd = create_rnd_commands(dim=4)  # TODO make dependent on model
     if model_features(model)["rotor_dynamics"]:
         with pytest.warns(UserWarning, match="Rotor velocity is not provided"):
             dpos, dquat, dvel, dang_vel, drotor_vel = model(
-                pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_name, xp), rotor_vel=None
+                pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_type, xp), rotor_vel=None
             )
     else:
         dpos, dquat, dvel, dang_vel, drotor_vel = model(
-            pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_name, xp), rotor_vel=None
+            pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_type, xp), rotor_vel=None
         )
     assert drotor_vel is None, "Model should not return rotor velocities without rotor_vel input"
     # Check if the output is on the correct device, has the correct type and shape
@@ -90,14 +90,14 @@ def test_model_single_no_rotor_dynamics(model_name: str, model: Callable, drone_
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_name", available_configs)
-def test_model_single_rotor_dynamics(model_name: str, model: Callable, drone_name: str):
+@pytest.mark.parametrize("drone_type", available_drone_types)
+def test_model_single_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
     skip_models_without_features(model, ["rotor_dynamics"])
 
     pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states()
     cmd = create_rnd_commands(dim=4)  # TODO make dependent on model
     dpos, dquat, dvel, dang_vel, drotor_vel = model(
-        pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_name, xp), rotor_vel=rotor_vel
+        pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_type, xp), rotor_vel=rotor_vel
     )
     # Check if the output is on the correct device, has the correct type and shape
     for dx, x in zip(
@@ -110,8 +110,8 @@ def test_model_single_rotor_dynamics(model_name: str, model: Callable, drone_nam
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_name", available_configs)
-def test_model_single_external_wrench(model_name: str, model: Callable, drone_name: str):
+@pytest.mark.parametrize("drone_type", available_drone_types)
+def test_model_single_external_wrench(model_name: str, model: Callable, drone_type: str):
     pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t = create_rnd_states()
     if not model_features(model)["rotor_dynamics"]:
         rotor_vel = None
@@ -122,7 +122,7 @@ def test_model_single_external_wrench(model_name: str, model: Callable, drone_na
         vel,
         ang_vel,
         cmd,
-        Constants.from_config(drone_name, xp),
+        Constants.from_config(drone_type, xp),
         rotor_vel=rotor_vel,
         dist_f=dist_f,
         dist_t=dist_t,
@@ -136,19 +136,19 @@ def test_model_single_external_wrench(model_name: str, model: Callable, drone_na
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_name", available_configs)
-def test_model_batched_no_rotor_dynamics(model_name: str, model: Callable, drone_name: str):
+@pytest.mark.parametrize("drone_type", available_drone_types)
+def test_model_batched_no_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
     batch_shape = (10,)
     pos, quat, vel, ang_vel, _, _, _ = create_rnd_states(batch_shape)
     cmd = create_rnd_commands(batch_shape, dim=4)  # TODO make dependent on model
     if model_features(model)["rotor_dynamics"]:
         with pytest.warns(UserWarning, match="Rotor velocity is not provided"):
             dpos, dquat, dvel, dang_vel, drotor_vel = model(
-                pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_name, xp), rotor_vel=None
+                pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_type, xp), rotor_vel=None
             )
     else:
         dpos, dquat, dvel, dang_vel, drotor_vel = model(
-            pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_name, xp), rotor_vel=None
+            pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_type, xp), rotor_vel=None
         )
     assert drotor_vel is None, "Model should not return rotor velocities without rotor_vel input"
     # Check if the output is on the correct device, has the correct type and shape
@@ -160,15 +160,15 @@ def test_model_batched_no_rotor_dynamics(model_name: str, model: Callable, drone
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_name", available_configs)
-def test_model_batched_rotor_dynamics(model_name: str, model: Callable, drone_name: str):
+@pytest.mark.parametrize("drone_type", available_drone_types)
+def test_model_batched_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
     skip_models_without_features(model, ["rotor_dynamics"])
 
     batch_shape = (10,)
     pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states(batch_shape)
     cmd = create_rnd_commands(batch_shape, dim=4)  # TODO make dependent on model
     dpos, dquat, dvel, dang_vel, drotor_vel = model(
-        pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_name, xp), rotor_vel=rotor_vel
+        pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_type, xp), rotor_vel=rotor_vel
     )
     # Check if the output is on the correct device, has the correct type and shape
     for dx, x in zip(
@@ -181,8 +181,8 @@ def test_model_batched_rotor_dynamics(model_name: str, model: Callable, drone_na
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_name", available_configs)
-def test_model_batched_external_wrench(model_name: str, model: Callable, drone_name: str):
+@pytest.mark.parametrize("drone_type", available_drone_types)
+def test_model_batched_external_wrench(model_name: str, model: Callable, drone_type: str):
     batch_shape = (10,)
     pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t = create_rnd_states(batch_shape)
     if not model_features(model)["rotor_dynamics"]:
@@ -194,7 +194,7 @@ def test_model_batched_external_wrench(model_name: str, model: Callable, drone_n
         vel,
         ang_vel,
         cmd,
-        Constants.from_config(drone_name, xp),
+        Constants.from_config(drone_type, xp),
         rotor_vel=rotor_vel,
         dist_f=dist_f,
         dist_t=dist_t,
@@ -208,7 +208,7 @@ def test_model_batched_external_wrench(model_name: str, model: Callable, drone_n
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("config", available_configs)
+@pytest.mark.parametrize("config", available_drone_types)
 def test_symbolic2numeric_no_external_wrench(model_name: str, model: Callable, config: str):
     batch_shape = (10,)
     pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states(batch_shape)
@@ -261,7 +261,7 @@ def test_symbolic2numeric_no_external_wrench(model_name: str, model: Callable, c
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("config", available_configs)
+@pytest.mark.parametrize("config", available_drone_types)
 def test_symbolic2numeric_external_wrench(model_name: str, model: Callable, config: str):
     batch_shape = (10,)
     pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t = create_rnd_states(batch_shape)
@@ -329,7 +329,7 @@ def test_symbolic2numeric_external_wrench(model_name: str, model: Callable, conf
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("config", available_configs)
+@pytest.mark.parametrize("config", available_drone_types)
 def test_numeric_batching(model_name: str, model: Callable, config: str):
     """Tests if batching works and if the results are identical to the non-batched version."""
     batch_shape = (10,)
@@ -377,7 +377,7 @@ def test_numeric_batching(model_name: str, model: Callable, config: str):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("config", available_configs)
+@pytest.mark.parametrize("config", available_drone_types)
 def test_numeric_jit(model_name: str, model: Callable, config: str):
     """Tests if the models are jitable and if the results are identical to the array API ones."""
     batch_shape = (10,)

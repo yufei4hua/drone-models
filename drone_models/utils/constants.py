@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from array_api_typing import Array
 
 # Configs (used in testing)
-available_configs: tuple = ("cf2x_L250", "cf2x_P250", "cf2x_T350")
+available_drone_types: tuple = ("cf2x_L250", "cf2x_P250", "cf2x_T350")
 
 
 class Constants(NamedTuple):
@@ -161,7 +161,7 @@ class Constants(NamedTuple):
     def from_config(config: str, xp: ModuleType = np) -> Constants:
         """Creates constants based on the give configuration.
 
-        For available configs see Constants.available_configs
+        For available configs see Constants.available_drone_types.
         """
         xp = np if xp is None else xp
         match config:

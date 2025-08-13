@@ -41,7 +41,7 @@ def dynamics_numeric(
 
     Args:
         model: The chosen dynamical model. See available_models
-        config: The chosen config/constants for the model. See Constants.available_configs
+        config: The chosen config/constants for the model. See Constants.available_drone_types
         xp: The array API to use (e.g. numpy, jax, cupy, ...).
 
     Returns:
@@ -109,7 +109,7 @@ def dynamic_numeric_from_symbolic(
 
     Args:
         model: The chosen dynamical model. See available_models
-        config: The chosen config/constants for the model. See Constants.available_configs
+        config: The chosen config/constants for the model. See Constants.available_drone_types
 
     Returns:
         A callable which takes the states and input and returns the derivative of the state.
