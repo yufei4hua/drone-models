@@ -64,12 +64,11 @@ class Constants(NamedTuple):
     DI_DD_ACC: Array
 
     @staticmethod
-    def from_file(path: Path, xp: ModuleType | None = None) -> Constants:
+    def from_file(path: Path, xp: ModuleType = np) -> Constants:
         """Creates constants based on the xml file at the given location.
 
         The constants are supposed to be under the costum/numeric category.
         """
-        xp = np if xp is None else xp
         # Constants
         drone_path = Path(__file__).parents[1] / path
         # read in all parameters from xml
@@ -159,7 +158,7 @@ class Constants(NamedTuple):
         )
 
     @staticmethod
-    def from_config(config: str, xp: ModuleType | None = None) -> Constants:
+    def from_config(config: str, xp: ModuleType = np) -> Constants:
         """Creates constants based on the give configuration.
 
         For available configs see Constants.available_configs
