@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-from functools import partial
 from typing import TYPE_CHECKING, Callable
 
 import array_api_compat.numpy as np
