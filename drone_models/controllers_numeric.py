@@ -24,7 +24,7 @@ import drone_models.utils.rotation as R
 from drone_models.utils.constants_controllers import cntrl_const_mel
 
 if TYPE_CHECKING:
-    from array_api_compat.typing import Array
+    from array_api_typing import Array
 
     from drone_models.utils.constants import Constants
 

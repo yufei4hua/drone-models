@@ -11,7 +11,7 @@ from scipy.spatial.transform import Rotation as R
 from drone_models.utils import rotation
 
 if TYPE_CHECKING:
-    from array_api_compat.typing import Array
+    from array_api_typing import Array
 
     from drone_models.utils.constants import Constants
 

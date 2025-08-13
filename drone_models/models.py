@@ -18,7 +18,7 @@ from drone_models.utils.constants import Constants
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from array_api_compat.typing import Array
+    from array_api_typing import Array
 
 # Used in testing
 available_models = {

@@ -7,13 +7,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple, Type
 
 if TYPE_CHECKING:
-    from array_api_compat.typing import Array
+    from array_api_typing import Array
 
 # Configs (used in testing)
 available_configs: tuple = ("cf2x_L250", "cf2x_P250", "cf2x_T350")
 
 
-# @dataclass(frozen=True)
 class Constants(NamedTuple):
     """This is a dataclass for all necessary constants in the models."""
 
