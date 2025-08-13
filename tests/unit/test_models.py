@@ -266,7 +266,6 @@ def test_symbolic2numeric_no_external_wrench(model_name: str, model: Callable, c
 def test_symbolic2numeric_external_wrench(model_name: str, model: Callable, config: str):
     batch_shape = (10,)
     pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t = create_rnd_states(batch_shape)
-    dist_t = dist_t * 0  # TODO remove
     if not model_features(model)["rotor_dynamics"]:
         rotor_vel = None
     cmd = create_rnd_commands(batch_shape, dim=4)  # TODO make dependent on model
@@ -428,9 +427,6 @@ def test_numeric_jit(model_name: str, model: Callable, config: str):
     jp_dot = jp.concat([x for x in jp_dot if x is not None], axis=-1)
 
     assert np.allclose(xp_dot, jp_dot), "numpy and jax results differ"
-
-
-# TODO test if symbolic and numeric models have the same results with external wrench
 
 
 # TODO test if external wrench gets applied properly. But how to test it?

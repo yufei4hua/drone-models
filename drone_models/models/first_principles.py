@@ -85,22 +85,24 @@ def dynamics(
 
     # Linear equation of motion
     forces_motor_vec_world = rot.apply(forces_motor_vec)
-    force_world_frame = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
+    forces_sum = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
     if dist_f is not None:
-        force_world_frame = force_world_frame + dist_f
+        forces_sum = forces_sum + dist_f
 
     pos_dot = vel
-    vel_dot = force_world_frame / constants.MASS
+    vel_dot = forces_sum / constants.MASS
 
     # Rotational equation of motion
-    torques = torques_motor_vec
+    torques_sum = torques_motor_vec
     if dist_t is not None:
         # print(f"{dist_t.shape=}, {torques.shape=}, {rot.inv().as_matrix().shape=}")
         # torques = torques + rot.inv().as_matrix()[..., None, :] @ dist_t
-        # print(f"{dist_t.shape=}, {torques.shape=}")
-        torques = torques + dist_t  # rot.apply(dist_t, inverse=True) * 0
+        print(f"{dist_t.shape=}, {torques_sum.shape=}")
+        torques_sum = torques_sum + rot.apply(dist_t, inverse=True)
     quat_dot = rotation.ang_vel2quat_dot(quat, ang_vel)
-    ang_vel_dot = (torques - xp.linalg.cross(ang_vel, ang_vel @ constants.J.T)) @ constants.J_INV.T
+    ang_vel_dot = (
+        torques_sum - xp.linalg.cross(ang_vel, ang_vel @ constants.J.T)
+    ) @ constants.J_INV.T
     # ang_vel_dot = constants.J_INV @ (torques - xp.linalg.cross(ang_vel, (constants.J @ ang_vel)))
 
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
@@ -144,24 +146,23 @@ def dynamics_symbolic(
 
     # Linear equation of motion
     forces_motor_vec_world = symbols.rot @ forces_motor_vec
-    force_world_frame = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
+    forces_sum = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
     if calc_dist_f is True:
-        force_world_frame = force_world_frame + symbols.dist_f
+        forces_sum = forces_sum + symbols.dist_f
 
     pos_dot = symbols.vel
-    vel_dot = force_world_frame / constants.MASS
+    vel_dot = forces_sum / constants.MASS
 
     # Rotational equation of motion
     xi = cs.vertcat(
         cs.horzcat(0, -symbols.ang_vel.T), cs.horzcat(symbols.ang_vel, -cs.skew(symbols.ang_vel))
     )
     quat_dot = 0.5 * (xi @ symbols.quat)
-    torques = torques_motor_vec
+    torques_sum = torques_motor_vec
     if calc_dist_t:
-        torques = torques + symbols.dist_t  # symbols.rot.T @ symbols.dist_t * 0
-        # cs.inv(symbols.rot) torques are in body frame
+        torques_sum = torques_sum + symbols.rot.T @ symbols.dist_t
     ang_vel_dot = constants.J_INV @ (
-        torques_motor_vec - cs.cross(symbols.ang_vel, constants.J @ symbols.ang_vel)
+        torques_sum - cs.cross(symbols.ang_vel, constants.J @ symbols.ang_vel)
     )
 
     if calc_rotor_vel:

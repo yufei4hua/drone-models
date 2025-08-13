@@ -93,7 +93,7 @@ def dynamics(
         torque = ang_vel_dot @ constants.J.mT + xp.linalg.cross(ang_vel, ang_vel @ constants.J.mT)
 
         # adding torque
-        torque = torque + dist_t  # TODO rotation into body frame
+        torque = torque + rot.apply(dist_t, inverse=True)  # TODO rotation into body frame
         # back to angular acceleration
         ang_vel_dot = (
             torque - xp.linalg.cross(ang_vel, ang_vel @ constants.J.T)
@@ -162,7 +162,7 @@ def dynamics_symbolic(
             symbols.ang_vel, constants.J @ symbols.ang_vel
         )
         # adding torque
-        torque = torque + symbols.dist_t  # TODO rotation into body frame
+        torque = torque + symbols.rot.T @ symbols.dist_t
         # back to angular acceleration
         ang_vel_dot = constants.J_INV @ (
             torque - cs.cross(symbols.ang_vel, constants.J @ symbols.ang_vel)
