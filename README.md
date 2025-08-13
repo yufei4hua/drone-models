@@ -26,3 +26,8 @@ Drone models @ LSY. Contains symbolic (CasADi) and numeric (ArrayAPI, i.e., NumP
 
 ## Usage
 `from drone_models import TODO`
+
+
+## Testing
+1. Install testing environment with `pixi install -e test`
+1. Run tests with `pixi run -e test pytest`
