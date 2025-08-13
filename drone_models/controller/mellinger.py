@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from array_api_compat import array_namespace
 from scipy.spatial.transform import Rotation as R
 
-import drone_models.utils.rotation as rotation
 from drone_models.transform import force2pwm, motor_force2rotor_speed, pwm2force
 
 if TYPE_CHECKING:
