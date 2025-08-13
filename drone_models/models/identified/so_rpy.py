@@ -76,14 +76,15 @@ def dynamics(
     ang_vel_dot = rotation.rpy_rates_deriv2ang_vel_deriv(quat, rpy_rates, rpy_rates_dot)
     if dist_t is not None:
         # adding torque disturbances to the state
-        # angular acceleration can be converted to total torque
-        torque = xp.matvec(constants.J, ang_vel_dot) - xp.linalg.cross(
-            ang_vel, xp.matvec(constants.J, ang_vel)
-        )
+        # angular acceleration can be converted to total torque given the inertia matrix
+        torque = ang_vel_dot @ constants.J.mT + xp.linalg.cross(ang_vel, ang_vel @ constants.J.mT)
+
         # adding torque
-        torque = torque + dist_t
+        torque = torque + dist_t  # TODO rotation into body frame
         # back to angular acceleration
-        ang_vel_dot = xp.matvec(constants.J_INV, torque)
+        ang_vel_dot = (
+            torque - xp.linalg.cross(ang_vel, ang_vel @ constants.J.T)
+        ) @ constants.J_INV.T
 
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
@@ -139,13 +140,15 @@ def dynamics_symbolic(
     if calc_dist_t:
         # adding torque disturbances to the state
         # angular acceleration can be converted to total torque
-        torque = constants.J @ ang_vel_dot - cs.cross(
+        torque = constants.J @ ang_vel_dot + cs.cross(
             symbols.ang_vel, constants.J @ symbols.ang_vel
         )
         # adding torque
-        torque = torque + symbols.dist_t
+        torque = torque + symbols.dist_t  # TODO rotation into body frame
         # back to angular acceleration
-        ang_vel_dot = constants.J_INV @ torque
+        ang_vel_dot = constants.J_INV @ (
+            torque - cs.cross(symbols.ang_vel, constants.J @ symbols.ang_vel)
+        )
 
     X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot)
     Y = cs.vertcat(symbols.pos, symbols.quat)

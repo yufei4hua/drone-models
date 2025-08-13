@@ -77,9 +77,12 @@ def dynamics(
     # Because there currently is no way to identify the z torque in relation to the thrust,
     # we rely on a old identified value that can compute rpm to torque.
     # force = kf * rpm², torque = km * rpm² => torque = km/kf*force TODO
-    torques_motor_vec = xp.matmul(forces_motor, constants.SIGN_MATRIX) * xp.stack(
-        [constants.L, constants.L, constants.KM / constants.KF]
+    torques_motor_vec = (
+        forces_motor
+        @ constants.SIGN_MATRIX
+        * xp.stack([constants.L, constants.L, constants.KM / constants.KF])
     )
+
     # Linear equation of motion
     forces_motor_vec_world = rot.apply(forces_motor_vec)
     force_world_frame = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
@@ -92,13 +95,14 @@ def dynamics(
     # Rotational equation of motion
     torques = torques_motor_vec
     if dist_t is not None:
-        # paper: rot.as_matrix() @ torques_dist
-        torques = torques + rot.apply(dist_t)
+        # print(f"{dist_t.shape=}, {torques.shape=}, {rot.inv().as_matrix().shape=}")
+        # torques = torques + rot.inv().as_matrix()[..., None, :] @ dist_t
+        # print(f"{dist_t.shape=}, {torques.shape=}")
+        torques = torques + dist_t  # rot.apply(dist_t, inverse=True) * 0
     quat_dot = rotation.ang_vel2quat_dot(quat, ang_vel)
-    ang_vel_dot = xp.matmul(
-        torques - xp.linalg.cross(ang_vel, xp.matmul(ang_vel, xp.asarray(constants.J).T)),
-        xp.asarray(constants.J_INV).T,
-    )
+    ang_vel_dot = (torques - xp.linalg.cross(ang_vel, ang_vel @ constants.J.T)) @ constants.J_INV.T
+    # ang_vel_dot = constants.J_INV @ (torques - xp.linalg.cross(ang_vel, (constants.J @ ang_vel)))
+
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
 
@@ -139,30 +143,26 @@ def dynamics_symbolic(
     )
 
     # Linear equation of motion
+    forces_motor_vec_world = symbols.rot @ forces_motor_vec
+    force_world_frame = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
+    if calc_dist_f is True:
+        force_world_frame = force_world_frame + symbols.dist_f
+
     pos_dot = symbols.vel
-    vel_dot = symbols.rot @ forces_motor_vec / constants.MASS + constants.GRAVITY_VEC
-    if calc_dist_f:
-        # Adding force disturbances to the state
-        vel_dot = vel_dot + symbols.dist_f / constants.MASS
+    vel_dot = force_world_frame / constants.MASS
 
     # Rotational equation of motion
     xi = cs.vertcat(
         cs.horzcat(0, -symbols.ang_vel.T), cs.horzcat(symbols.ang_vel, -cs.skew(symbols.ang_vel))
     )
     quat_dot = 0.5 * (xi @ symbols.quat)
+    torques = torques_motor_vec
+    if calc_dist_t:
+        torques = torques + symbols.dist_t  # symbols.rot.T @ symbols.dist_t * 0
+        # cs.inv(symbols.rot) torques are in body frame
     ang_vel_dot = constants.J_INV @ (
         torques_motor_vec - cs.cross(symbols.ang_vel, constants.J @ symbols.ang_vel)
     )
-    if calc_dist_t:
-        # adding torque disturbances to the state
-        # angular acceleration can be converted to total torque
-        torque = constants.J @ ang_vel_dot - cs.cross(
-            symbols.ang_vel, constants.J @ symbols.ang_vel
-        )
-        # adding torque
-        torque = torque + symbols.torques_dist
-        # back to angular acceleration
-        ang_vel_dot = constants.J_INV @ torque
 
     if calc_rotor_vel:
         X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot)
