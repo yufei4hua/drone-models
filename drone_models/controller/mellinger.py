@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
+import numpy as np
 from array_api_compat import array_namespace
 from scipy.spatial.transform import Rotation as R
 
@@ -15,16 +16,26 @@ if TYPE_CHECKING:
     from drone_models.utils.constants import Constants
 
 
-def pos2attitude(
+def state2attitude(
     pos: Array,
     quat: Array,
     vel: Array,
     ang_vel: Array,
     cmd: Array,
-    constants: Constants,
-    parameters: dict[str, Array | float],
-    dt: float = 1 / 500,
-    i_error: Array | None = None,
+    ctrl_freq: float = 100,
+    ctrl_errors: tuple[Array, ...] = (),
+    ctrl_info: tuple[Array, ...] = (),
+    *,
+    mass: float,
+    kp: Array,
+    kd: Array,
+    ki: Array,
+    gravity_vec: Array,
+    mass_thrust: float,
+    i_range: Array,
+    thrust_min: float,
+    thrust_max: float,
+    pwm_max: float,
 ) -> tuple[Array, Array]:
     """Compute the positional part of the mellinger controller.
 
@@ -56,23 +67,19 @@ def pos2attitude(
     setpoint_vel = cmd[..., 3:6]
     setpoint_acc = cmd[..., 6:9]
     setpoint_yaw = cmd[..., 9]
+    dt = 1 / ctrl_freq
     # setpointRPY_rates = cmd[..., 10:13]
     # From firmware controller_mellinger
     r_error = setpoint_pos - pos  # l. 145 Position Error (ep)
     v_error = setpoint_vel - vel  # l. 148 Velocity Error (ev)
     # l.151 ff Integral Error
-    if i_error is None:
-        i_error = xp.zeros_like(pos)
-    i_error = xp.clip(i_error + r_error * dt, -parameters["i_range"], parameters["i_range"])
+    i_error = xp.zeros_like(pos) if ctrl_errors == () else ctrl_errors[0]
+    i_error = xp.clip(i_error + r_error * dt, -i_range, i_range)
     # l. 161 Desired thrust [F_des]
     # => only one case here, since setpoint is always in absolute mode
     # Note: since we've defined the gravity in z direction, a "-" needs to be added
-    target_thrust = (
-        parameters["mass"] * (setpoint_acc - constants.GRAVITY_VEC)
-        + parameters["kp"] * r_error
-        + parameters["kd"] * v_error
-        + parameters["ki"] * i_error
-    )
+    target_thrust = mass * (setpoint_acc - gravity_vec) + kp * r_error + kd * v_error + ki * i_error
+    target_thrust = xp.clip(target_thrust, thrust_min * 4, thrust_max * 4)
     # l. 178 Rate-controlled YAW is moving YAW angle setpoint
     # => only one case here, since the setpoint is always in absolute mode
     desiredYaw = setpoint_yaw
@@ -102,9 +109,8 @@ def pos2attitude(
     matrix = xp.stack((x_axis_desired, y_axis_desired, z_axis_desired), axis=-1)
     command_RPY = R.from_matrix(matrix).as_euler("xyz", degrees=False)
     # l. 283
-    thrust = parameters["massThrust"] * current_thrust
     # Transform thrust into N to keep uniform interface
-    thrust = pwm2force(thrust, constants.THRUST_MAX, constants.PWM_MAX) * 4
+    thrust = pwm2force(mass_thrust * current_thrust, thrust_max, pwm_max) * 4
     command_rpyt = xp.concat((command_RPY, thrust[..., None]), axis=-1)
     return command_rpyt, i_error
 
@@ -264,3 +270,41 @@ def pwm_clip(motor_pwm: Array, constants: Constants) -> Constants:
     return xp.where(
         xp.all(motor_pwm == 0), 0.0, xp.clip(motor_pwm, constants.PWM_MIN, constants.PWM_MAX)
     )
+
+
+class MellingerStateParams(NamedTuple):
+    """Parameters for the Mellinger state controller."""
+
+    mass: float
+    kp: Array
+    kd: Array
+    ki: Array
+    gravity_vec: Array
+    mass_thrust: float
+    i_range: Array
+    thrust_min: float
+    thrust_max: float
+    pwm_max: float
+
+    @staticmethod
+    def load(drone_model: str) -> MellingerStateParams:
+        """Load the parameters from the config file."""
+        params = MellingerStateParams._load_fake_model()
+        return MellingerStateParams(**params)
+
+    @staticmethod
+    def _load_fake_model() -> dict[str, Array | float]:
+        """Load the parameters from the config file."""
+        # TODO: Remove this once we can load proper params
+        return {
+            "mass": 0.034,
+            "mass_thrust": 132000 * 0.034 / 0.027,
+            "kp": np.array([0.4, 0.4, 1.25]),
+            "kd": np.array([0.2, 0.2, 0.4]),
+            "ki": np.array([0.05, 0.05, 0.05]),
+            "i_range": np.array([2.0, 2.0, 0.4]),
+            "gravity_vec": np.array([0.0, 0.0, -9.81]),  # TODO: Double-check if we want this
+            "thrust_min": 0.02,
+            "thrust_max": 0.1125,
+            "pwm_max": 65535.0,
+        }
