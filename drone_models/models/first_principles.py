@@ -103,6 +103,7 @@ def dynamics(
     ang_vel_dot = (
         torques_sum - xp.linalg.cross(ang_vel, ang_vel @ constants.J.T)
     ) @ constants.J_INV.T
+    # TODO: Why ang_vel @ J.T instead of J @ ang_vel?
     # ang_vel_dot = constants.J_INV @ (torques - xp.linalg.cross(ang_vel, (constants.J @ ang_vel)))
 
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot

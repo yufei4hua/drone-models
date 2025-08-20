@@ -11,7 +11,7 @@ from scipy.spatial.transform import Rotation as R
 
 import drone_models.models.symbols as symbols
 from drone_models.models.utils import supports
-from drone_models.transform import motor_force2rotor_speed
+from drone_models.transform import motor_force2rotor_vel
 from drone_models.utils import rotation
 
 if TYPE_CHECKING:
@@ -51,7 +51,7 @@ def dynamics(
     """
     xp = array_namespace(pos)
     cmd_f = cmd[..., -1]
-    cmd_rotor_vel = motor_force2rotor_speed(cmd_f / 4, constants.KF)
+    cmd_rotor_vel = motor_force2rotor_vel(cmd_f / 4, constants.KF)
     cmd_rpy = cmd[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
@@ -125,7 +125,7 @@ def dynamics_symbolic(
 
     # Defining the dynamics function
     if calc_rotor_vel:
-        # motor_force2rotor_speed
+        # motor_force2rotor_vel
         cmd_rotor_vel = cs.sqrt(symbols.cmd_thrust / 4 / constants.KF)
         rotor_vel_dot = 1 / constants.DI_D_ACC[2] * (cmd_rotor_vel - symbols.rotor_vel)
         thrust = constants.KF * cs.sum1(symbols.rotor_vel**2)
