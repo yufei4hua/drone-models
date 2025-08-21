@@ -8,6 +8,7 @@ broadcasting to support batching of arbitrary leading dimensions.
 
 from typing import Callable
 
+from drone_models.controller.core import parametrize
 from drone_models.controller.mellinger import (
     attitude2force_torque as mellinger_attitude2force_torque,
 )
@@ -17,3 +18,5 @@ available_controller: dict[str, Callable] = {
     "mellinger_state2attitude": mellinger_state2attitude,
     "mellinger_attitude2force_torque": mellinger_attitude2force_torque,
 }
+
+__all__ = ["parametrize"]

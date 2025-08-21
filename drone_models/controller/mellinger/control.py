@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING
 
 import array_api_extra as xpx
-import numpy as np
 from array_api_compat import array_namespace
 from scipy.spatial.transform import Rotation as R
 
+from drone_models.controller.core import register_controller_parameters
+from drone_models.controller.mellinger.params import AttitudeParams, ForceTorqueParams, StateParams
 from drone_models.transform import force2pwm, motor_force2rotor_vel, pwm2force
 
 if TYPE_CHECKING:
     from array_api_typing import Array
 
 
+@register_controller_parameters(StateParams)
 def state2attitude(
     pos: Array,
     quat: Array,
@@ -130,6 +132,7 @@ def state2attitude(
     return command_rpyt, int_pos_err
 
 
+@register_controller_parameters(AttitudeParams)
 def attitude2force_torque(
     pos: Array,
     quat: Array,
@@ -259,6 +262,7 @@ def force_torque_pwms2pwms(force_pwm: Array, torque_pwm: Array, mixing_matrix: A
     return force_pwm[..., None] + (mixing_matrix @ torque_pwm[..., None])[..., 0]
 
 
+@register_controller_parameters(ForceTorqueParams)
 def force_torque2rotor_vel(
     force: Array,
     torque: Array,
@@ -300,127 +304,3 @@ def force_torque2rotor_vel(
     motor_forces = xp.where(xp.all(force == 0), 0.0, xp.clip(motor_forces, thrust_min, thrust_max))
     # Assume perfect battery compensation and calculate the desired motor speeds directly
     return motor_force2rotor_vel(motor_forces, KF)
-
-
-class MellingerStateParams(NamedTuple):
-    """Parameters for the Mellinger state controller."""
-
-    mass: float
-    kp: Array
-    kd: Array
-    ki: Array
-    gravity_vec: Array
-    mass_thrust: float
-    int_err_max: Array
-    thrust_max: float
-    pwm_max: float
-
-    @staticmethod
-    def load(drone_model: str) -> MellingerStateParams:
-        """Load the parameters from the config file."""
-        params = MellingerStateParams._load_fake_model()
-        return MellingerStateParams(**params)
-
-    @staticmethod
-    def _load_fake_model() -> dict[str, Array | float]:
-        """Load the parameters from the config file."""
-        # TODO: Remove this once we can load proper params
-        return {
-            "mass": 0.032999999821186066,
-            "mass_thrust": 132000 * 0.034 / 0.027,
-            "kp": np.array([0.4, 0.4, 1.25]),
-            "kd": np.array([0.2, 0.2, 0.5]),
-            "ki": np.array([0.05, 0.05, 0.05]),
-            "int_err_max": np.array([2.0, 2.0, 0.4]),
-            # TODO: Double-check if we want this
-            "gravity_vec": np.array([0.0, 0.0, -9.8100004196167]),
-            "thrust_max": 0.1125,
-            "pwm_max": 65535.0,
-        }
-
-
-class MellingerAttitudeParams(NamedTuple):
-    """Parameters for the Mellinger attitude controller."""
-
-    kR: Array
-    kw: Array
-    ki_m: Array
-    kd_omega: Array
-    int_err_max: Array
-    torque_pwm_max: Array
-    thrust_max: float
-    pwm_min: float
-    pwm_max: float
-    L: float
-    KF: float
-    KM: float
-    mixing_matrix: Array
-
-    @staticmethod
-    def load(drone_model: str) -> MellingerAttitudeParams:
-        """Load the parameters from the config file."""
-        params = MellingerAttitudeParams._load_fake_model()
-        return MellingerAttitudeParams(**params)
-
-    @staticmethod
-    def _load_fake_model() -> dict[str, Array | float]:
-        """Load the parameters from the config file."""
-        # TODO: Remove this once we can load proper params
-        # fmt: off
-        mixing_matrix = np.array([[-1.0, -1.0, -1.0],
-                                  [-1.0,  1.0,  1.0],
-                                  [ 1.0,  1.0, -1.0],
-                                  [ 1.0, -1.0,  1.0]]
-                                )
-        # fmt: on
-        return {
-            "kR": np.array([70_000.0, 70_000.0, 60_000.0]),
-            "kw": np.array([20_000.0, 20_000.0, 12_000.0]),
-            "ki_m": np.array([0.0, 0.0, 500.0]),
-            "kd_omega": np.array([200.0, 200.0, 0.0]),
-            "int_err_max": np.array([1.0, 1.0, 1500.0]),
-            "torque_pwm_max": np.array([32_000.0, 32_000.0, 32_000.0]),
-            "thrust_max": 0.1125,
-            "pwm_min": 20_000.0,
-            "pwm_max": 65_535.0,
-            "L": 0.03253,
-            "KF": 8.7e-10,
-            "KM": 7.94e-12,
-            "mixing_matrix": mixing_matrix,
-        }
-
-
-class MellingerForceTorqueParams(NamedTuple):
-    """Parameters for the Mellinger force torque controller."""
-
-    thrust_min: float
-    thrust_max: float
-    L: float
-    KF: float
-    KM: float
-    mixing_matrix: Array
-
-    @staticmethod
-    def load(drone_model: str) -> MellingerForceTorqueParams:
-        """Load the parameters from the config file."""
-        params = MellingerForceTorqueParams._load_fake_model()
-        return MellingerForceTorqueParams(**params)
-
-    @staticmethod
-    def _load_fake_model() -> dict[str, Array | float]:
-        """Load the parameters from the config file."""
-        # fmt: off
-        mixing_matrix = np.array([[-1.0, -1.0, -1.0],
-                                  [-1.0,  1.0,  1.0],
-                                  [ 1.0,  1.0, -1.0],
-                                  [ 1.0, -1.0,  1.0]]
-                                 )
-        # fmt: on
-        return {
-            "thrust_min": 0.02,
-            "thrust_max": 0.1125,
-            "L": 0.03253,
-            "KF": 8.701227710666256e-10,
-            "KM": 7.94e-12,
-            "mixing_matrix": mixing_matrix,
-        }
