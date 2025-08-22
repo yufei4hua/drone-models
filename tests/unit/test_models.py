@@ -13,7 +13,8 @@ import jax.numpy as jp
 import pytest
 from array_api_compat import device as xp_device
 
-from drone_models.models import available_models, model_features
+from drone_models import available_models, model_features
+from drone_models.core import parametrize
 from drone_models.utils.constants import Constants, available_drone_types
 
 if TYPE_CHECKING:
@@ -23,23 +24,21 @@ if TYPE_CHECKING:
 jax.config.update("jax_enable_x64", True)
 
 
-def create_rnd_states(
-    shape: tuple[int, ...] = (),
-) -> tuple[Array, Array, Array, Array, Array, Array, Array]:
-    """Creates N random states."""
-    pos = xp.asarray(np.random.uniform(-5, 5, shape + (3,)))
-    quat = xp.asarray(np.random.uniform(-1, 1, shape + (4,)))  # Libraries normalize automatically
-    vel = xp.asarray(np.random.uniform(-5, 5, shape + (3,)))
-    ang_vel = xp.asarray(np.random.uniform(-2, 2, shape + (3,)))
-    rotor_vel = xp.asarray(np.random.uniform(0, 0.2, shape + (4,)))
-    forces_dist = xp.asarray(np.random.uniform(-0.2, 0.2, shape + (3,)))
-    torques_dist = xp.asarray(np.random.uniform(-0.05, 0.05, shape + (3,)))
-    return pos, quat, vel, ang_vel, rotor_vel, forces_dist, torques_dist
+def create_rnd_states(shape: tuple[int, ...] = ()) -> tuple[Array, Array, Array, Array]:
+    x = np.random.randn(*shape, 3 + 4 + 3 + 3 + 4 + 3 + 3)
+    pos = xp.asarray(x[..., :3])
+    quat = xp.asarray(x[..., 3:7])
+    vel = xp.asarray(x[..., 7:10])
+    ang_vel = xp.asarray(x[..., 10:13])
+    rotor_vel = xp.asarray(x[..., 13:17])
+    dist_f = xp.asarray(x[..., 17:20])
+    dist_t = xp.asarray(x[..., 20:23])
+    return pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t
 
 
 def create_rnd_commands(shape: tuple[int, ...] = (), dim: int = 4) -> Array:
     """Creates N random inputs with size dim."""
-    return xp.asarray(np.random.uniform(0, 0.2, shape + (dim,)))
+    return xp.asarray(np.random.randn(*shape, dim))
 
 
 def skip_models_without_features(model: Callable, features: list[str]):
@@ -70,15 +69,16 @@ def test_model_features(model_name: str, model: Callable):
 @pytest.mark.parametrize("drone_type", available_drone_types)
 def test_model_single_no_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
     pos, quat, vel, ang_vel, _, _, _ = create_rnd_states()
+    model = parametrize(model, drone_type, xp=xp)
     cmd = create_rnd_commands(dim=4)  # TODO make dependent on model
     if model_features(model)["rotor_dynamics"]:
         with pytest.warns(UserWarning, match="Rotor velocity is not provided"):
             dpos, dquat, dvel, dang_vel, drotor_vel = model(
-                pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_type, xp), rotor_vel=None
+                pos, quat, vel, ang_vel, cmd, rotor_vel=None
             )
     else:
         dpos, dquat, dvel, dang_vel, drotor_vel = model(
-            pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_type, xp), rotor_vel=None
+            pos, quat, vel, ang_vel, cmd, rotor_vel=None
         )
     assert drotor_vel is None, "Model should not return rotor velocities without rotor_vel input"
     # Check if the output is on the correct device, has the correct type and shape
@@ -93,12 +93,11 @@ def test_model_single_no_rotor_dynamics(model_name: str, model: Callable, drone_
 @pytest.mark.parametrize("drone_type", available_drone_types)
 def test_model_single_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
     skip_models_without_features(model, ["rotor_dynamics"])
+    model = parametrize(model, drone_type, xp=xp)
 
     pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states()
-    cmd = create_rnd_commands(dim=4)  # TODO make dependent on model
-    dpos, dquat, dvel, dang_vel, drotor_vel = model(
-        pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_type, xp), rotor_vel=rotor_vel
-    )
+    cmd = create_rnd_commands(dim=4)
+    dpos, dquat, dvel, dang_vel, drotor_vel = model(pos, quat, vel, ang_vel, cmd, rotor_vel)
     # Check if the output is on the correct device, has the correct type and shape
     for dx, x in zip(
         [dpos, dquat, dvel, dang_vel, drotor_vel], [pos, quat, vel, ang_vel, rotor_vel], strict=True
@@ -112,20 +111,13 @@ def test_model_single_rotor_dynamics(model_name: str, model: Callable, drone_typ
 @pytest.mark.parametrize("model_name, model", available_models.items())
 @pytest.mark.parametrize("drone_type", available_drone_types)
 def test_model_single_external_wrench(model_name: str, model: Callable, drone_type: str):
+    model = parametrize(model, drone_type, xp=xp)
     pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t = create_rnd_states()
     if not model_features(model)["rotor_dynamics"]:
         rotor_vel = None
     cmd = create_rnd_commands(dim=4)  # TODO make dependent on model
     dpos, dquat, dvel, dang_vel, drotor_vel = model(
-        pos,
-        quat,
-        vel,
-        ang_vel,
-        cmd,
-        Constants.from_config(drone_type, xp),
-        rotor_vel=rotor_vel,
-        dist_f=dist_f,
-        dist_t=dist_t,
+        pos, quat, vel, ang_vel, cmd, rotor_vel, dist_f, dist_t
     )
     # Check if the output is on the correct device, has the correct type and shape
     for dx, x in zip([dpos, dquat, dvel, dang_vel], [pos, quat, vel, ang_vel], strict=True):
@@ -138,18 +130,15 @@ def test_model_single_external_wrench(model_name: str, model: Callable, drone_ty
 @pytest.mark.parametrize("model_name, model", available_models.items())
 @pytest.mark.parametrize("drone_type", available_drone_types)
 def test_model_batched_no_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
+    model = parametrize(model, drone_type, xp=xp)
     batch_shape = (10,)
     pos, quat, vel, ang_vel, _, _, _ = create_rnd_states(batch_shape)
     cmd = create_rnd_commands(batch_shape, dim=4)  # TODO make dependent on model
     if model_features(model)["rotor_dynamics"]:
         with pytest.warns(UserWarning, match="Rotor velocity is not provided"):
-            dpos, dquat, dvel, dang_vel, drotor_vel = model(
-                pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_type, xp), rotor_vel=None
-            )
+            dpos, dquat, dvel, dang_vel, drotor_vel = model(pos, quat, vel, ang_vel, cmd, None)
     else:
-        dpos, dquat, dvel, dang_vel, drotor_vel = model(
-            pos, quat, vel, ang_vel, cmd, Constants.from_config(drone_type, xp), rotor_vel=None
-        )
+        dpos, dquat, dvel, dang_vel, drotor_vel = model(pos, quat, vel, ang_vel, cmd, None)
     assert drotor_vel is None, "Model should not return rotor velocities without rotor_vel input"
     # Check if the output is on the correct device, has the correct type and shape
     for dx, x in zip([dpos, dquat, dvel, dang_vel], [pos, quat, vel, ang_vel], strict=True):

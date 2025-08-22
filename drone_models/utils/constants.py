@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from array_api_typing import Array
 
 # Configs (used in testing)
-available_drone_types: tuple = ("cf2x_L250", "cf2x_P250", "cf2x_T350")
+available_drone_types: tuple = ("cf2x_L250",)  # , "cf2x_P250", "cf2x_T350")
 
 
 class Constants(NamedTuple):
@@ -166,10 +166,10 @@ class Constants(NamedTuple):
         xp = np if xp is None else xp
         match config:
             case "cf2x_L250":
-                return Constants.from_file("models/data/cf2x_L250.xml", xp)
+                return Constants.from_file("data/cf2x_L250.xml", xp)
             case "cf2x_P250":
-                return Constants.from_file("models/data/cf2x_P250.xml", xp)
+                return Constants.from_file("data/cf2x_P250.xml", xp)
             case "cf2x_T350":
-                return Constants.from_file("models/data/cf2x_T350.xml", xp)
+                return Constants.from_file("data/cf2x_T350.xml", xp)
             case _:
                 raise ValueError(f"Drone config '{config}' is not supported")

@@ -9,8 +9,9 @@ import casadi as cs
 from array_api_compat import array_namespace
 from scipy.spatial.transform import Rotation as R
 
-import drone_models.models.symbols as symbols
-from drone_models.models.utils import supports
+import drone_models.symbols as symbols
+from drone_models.core import register_model_parameters, supports
+from drone_models.so_rpy_rotor_drag.params import SoRpyRotorDragParams
 from drone_models.transform import motor_force2rotor_vel
 from drone_models.utils import rotation
 
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from drone_models.utils.constants import Constants
 
 
+@register_model_parameters(SoRpyRotorDragParams)
 @supports(rotor_dynamics=True)
 def dynamics(
     pos: Array,
@@ -27,10 +29,24 @@ def dynamics(
     vel: Array,
     ang_vel: Array,
     command: Array,
-    constants: Constants,
     rotor_vel: Array | None = None,
     dist_f: Array | None = None,
     dist_t: Array | None = None,
+    *,
+    mass: float,
+    gravity_vec: Array,
+    KF: Array,
+    KM: Array,
+    J: Array,
+    J_inv: Array,
+    rotor_coef: Array,
+    acc_coef: Array,
+    cmd_f_coef: Array,
+    rpy_coef: Array,
+    rpy_rates_coef: Array,
+    cmd_rpy_coef: Array,
+    drag_linear_coef: Array,
+    drag_abs_linear_coef: Array,
 ) -> tuple[Array, Array, Array, Array, Array | None]:
     """The fitted double integrator (DI) model with optional motor delay (D).
 
@@ -51,7 +67,7 @@ def dynamics(
     """
     xp = array_namespace(pos)
     cmd_f = command[..., -1]
-    cmd_rotor_vel = motor_force2rotor_vel(cmd_f / 4, constants.KF)
+    cmd_rotor_vel = motor_force2rotor_vel(cmd_f / 4, KF)
     cmd_rpy = command[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
@@ -61,46 +77,37 @@ def dynamics(
         rotor_vel = cmd_rotor_vel
         warnings.warn("Rotor velocity is not provided, using commanded rotor velocity directly.")
     else:
-        rotor_vel_dot = (
-            1 / constants.DI_DD_ACC[2] * (cmd_rotor_vel[..., None] - rotor_vel)
-            - constants.KM * rotor_vel**2
-        )
-    forces_motor = xp.sum(constants.KF * rotor_vel**2, axis=-1)
+        rotor_vel_dot = 1 / rotor_coef * (cmd_rotor_vel[..., None] - rotor_vel) - KM * rotor_vel**2
+    forces_motor = xp.sum(KF * rotor_vel**2, axis=-1)
     forces_sum = xp.sum(forces_motor, axis=-1)
-    thrust = constants.DI_DD_ACC[0] + constants.DI_DD_ACC[1] * forces_sum
+    thrust = acc_coef + cmd_f_coef * forces_sum
 
     drone_z_axis = rot.inv().as_matrix()[..., -1, :]
 
     pos_dot = vel
     vel_dot = (
-        1 / constants.MASS * thrust[..., None] * drone_z_axis
-        + constants.GRAVITY_VEC
-        + 1 / constants.MASS * constants.DI_DD_ACC[2] * vel
-        + 1 / constants.MASS * constants.DI_DD_ACC[3] * vel * xp.abs(vel)
+        1 / mass * thrust[..., None] * drone_z_axis
+        + gravity_vec
+        + 1 / mass * drag_linear_coef * vel
+        + 1 / mass * drag_abs_linear_coef * vel * xp.abs(vel)
     )
     if dist_f is not None:
-        vel_dot = vel_dot + dist_f / constants.MASS
+        vel_dot = vel_dot + dist_f / mass
 
     # Rotational equation of motion
     quat_dot = rotation.ang_vel2quat_dot(quat, ang_vel)
     rpy_rates = rotation.ang_vel2rpy_rates(quat, ang_vel)
-    rpy_rates_dot = (
-        constants.DI_DD_PARAMS[:, 0] * euler_angles
-        + constants.DI_DD_PARAMS[:, 1] * rpy_rates
-        + constants.DI_DD_PARAMS[:, 2] * cmd_rpy
-    )
+    rpy_rates_dot = rpy_coef * euler_angles + rpy_rates_coef * rpy_rates + cmd_rpy_coef * cmd_rpy
     ang_vel_dot = rotation.rpy_rates_deriv2ang_vel_deriv(quat, rpy_rates, rpy_rates_dot)
     if dist_t is not None:
         # adding torque disturbances to the state
         # angular acceleration can be converted to total torque given the inertia matrix
-        torque = ang_vel_dot @ constants.J.mT + xp.linalg.cross(ang_vel, ang_vel @ constants.J.mT)
+        torque = ang_vel_dot @ J.mT + xp.linalg.cross(ang_vel, ang_vel @ J.mT)
 
         # adding torque
         torque = torque + rot.apply(dist_t, inverse=True)
         # back to angular acceleration
-        ang_vel_dot = (
-            torque - xp.linalg.cross(ang_vel, ang_vel @ constants.J.T)
-        ) @ constants.J_INV.T
+        ang_vel_dot = J_inv @ (torque - xp.linalg.cross(ang_vel, J @ ang_vel))
 
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
