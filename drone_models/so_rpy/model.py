@@ -33,13 +33,13 @@ def dynamics(
     *,
     mass: float,
     gravity_vec: Array,
+    J: Array,
+    J_inv: Array,
     acc_coef: Array,
     cmd_f_coef: Array,
     rpy_coef: Array,
     rpy_rates_coef: Array,
     cmd_rpy_coef: Array,
-    J: Array,
-    J_inv: Array,
 ) -> tuple[Array, Array, Array, Array, Array | None]:
     """The fitted double integrator (DI) model with optional motor delay (D).
 
@@ -49,11 +49,20 @@ def dynamics(
         vel: Velocity of the drone (m/s).
         ang_vel: Angular velocity of the drone (rad/s).
         cmd: Roll pitch yaw (rad) and collective thrust (N) command.
-        constants: Containing the constants of the drone.
-        rotor_vel: Speed of the 4 motors (rad/s). If None, the commanded thrust is directly
-            applied. If a value is given, the function raises an error.
+        rotor_vel: Speed of the 4 motors (rad/s). Kept for compatibility with the model signature.
         dist_f: Disturbance force (N) acting on the CoM.
         dist_t: Disturbance torque (Nm) acting on the CoM.
+
+        mass: Mass of the drone (kg).
+        gravity_vec: Gravity vector (m/s^2). We assume the gravity vector points downwards, e.g.
+            [0, 0, -9.81].
+        J: Inertia matrix (kg m^2).
+        J_inv: Inverse inertia matrix (1/kg m^2).
+        acc_coef: Coefficient for the acceleration (1/s^2).
+        cmd_f_coef: Coefficient for the collective thrust (N/rad^2).
+        rpy_coef: Coefficient for the roll pitch yaw dynamics (1/s).
+        rpy_rates_coef: Coefficient for the roll pitch yaw rates dynamics (1/s^2).
+        cmd_rpy_coef: Coefficient for the roll pitch yaw command dynamics (1/s).
 
     Returns:
         The derivatives of all state variables.
@@ -93,7 +102,8 @@ def dynamics(
         # adding torque
         torque = torque + rot.apply(dist_t, inverse=True)
         # back to angular acceleration
-        ang_vel_dot = J_inv @ (torque - xp.linalg.cross(ang_vel, J @ ang_vel))
+        torque = torque - xp.linalg.cross(ang_vel, (J @ ang_vel[..., None])[..., 0])
+        ang_vel_dot = (J_inv @ torque[..., None])[..., 0]
 
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 

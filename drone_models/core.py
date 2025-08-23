@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from functools import partial, wraps
 from typing import TYPE_CHECKING, Any, Callable, ParamSpec, Protocol, TypeVar, runtime_checkable
 
@@ -33,6 +34,8 @@ def supports(rotor_dynamics: bool = True) -> Callable[[F], F]:
         ) -> tuple[Array, Array, Array, Array, Array | None]:
             if not rotor_dynamics and rotor_vel is not None:
                 raise ValueError("Rotor dynamics not supported, but rotor_vel is provided.")
+            if rotor_dynamics and rotor_vel is None:
+                warnings.warn("Rotor velocity not provided, using commanded rotor velocity.")
             return fn(pos, quat, vel, ang_vel, cmd, rotor_vel, *args, **kwargs)
 
         wrapper.__drone_model_features__ = {"rotor_dynamics": rotor_dynamics}

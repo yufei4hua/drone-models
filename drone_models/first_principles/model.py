@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING
 
 import casadi as cs
@@ -30,15 +29,15 @@ def dynamics(
     dist_f: Array | None = None,
     dist_t: Array | None = None,
     *,
-    thrust_tau: float,
+    mass: float,
+    gravity_vec: Array,
+    J: Array,
+    J_inv: Array,
     KF: float,
     KM: float,
     L: float,
     mixing_matrix: Array,
-    gravity_vec: Array,
-    mass: float,
-    J: Array,
-    J_inv: Array,
+    thrust_tau: float,
 ) -> tuple[Array, Array, Array, Array, Array | None]:
     r"""First principles model for a quatrotor.
 
@@ -52,11 +51,21 @@ def dynamics(
         vel: Velocity of the drone (m/s).
         ang_vel: Angular velocity of the drone (rad/s).
         cmd: Motor speeds (rad/s).
-        constants: Containing the constants of the drone.
         rotor_vel: Angular velocity of the 4 motors (rad/s). If None, the commanded thrust is
             directly applied. If value is given, thrust dynamics are calculated.
         dist_f: Disturbance force acting on the CoM (N).
         dist_t: Disturbance torque acting on the CoM (Nm).
+
+        mass: Mass of the drone (kg).
+        gravity_vec: Gravity vector (m/s^2). We assume the gravity vector points downwards, e.g.
+            [0, 0, -9.81].
+        J: Inertia matrix (kg m^2).
+        J_inv: Inverse inertia matrix (1/kg m^2).
+        KF: Motor force constant (N/rad^2).
+        KM: Motor torque constant (Nm/rad^2).
+        L: Distance from the CoM to the motor (m).
+        mixing_matrix: Mixing matrix denoting the turn direction of the motors (4x3).
+        thrust_tau: Thrust time constant (s).
 
     .. math::
         \sum_{i=1}^{\\infty} x_{i} TODO
@@ -67,15 +76,13 @@ def dynamics(
         More information https://ahrs.readthedocs.io/en/latest/filters/angular.html
     """
     xp = array_namespace(pos)
-    mass, gravity_vec, KF, KM, L, mixing_matrix, J, J_inv = to_xp(
-        mass, gravity_vec, KF, KM, L, mixing_matrix, J, J_inv, xp=xp, device=device(pos)
+    mass, gravity_vec, J, J_inv, KF, KM, L, mixing_matrix, thrust_tau = to_xp(
+        mass, gravity_vec, J, J_inv, KF, KM, L, mixing_matrix, thrust_tau, xp=xp, device=device(pos)
     )
     rot = R.from_quat(quat)
     # Rotor dynamics
     if rotor_vel is None:
-        rotor_vel_dot = None
-        rotor_vel = cmd
-        warnings.warn("Rotor velocity is not provided, using commanded rotor velocity directly.")
+        rotor_vel, rotor_vel_dot = cmd, None
     else:
         rotor_vel_dot = 1 / thrust_tau * (cmd - rotor_vel) - 1 / KM * rotor_vel**2
     # Creating force and torque vector
@@ -87,7 +94,7 @@ def dynamics(
     # Because there currently is no way to identify the z torque in relation to the thrust,
     # we rely on a old identified value that can compute rpm to torque.
     # force = kf * rpm², torque = km * rpm² => torque = km/kf*force TODO
-    torques_motor_vec = forces_motor @ mixing_matrix * xp.stack([L, L, KM / KF])
+    torque = forces_motor @ mixing_matrix * xp.stack([L, L, KM / KF])
 
     # Linear equation of motion
     forces_motor_vec_world = rot.apply(forces_motor_vec)
@@ -99,12 +106,11 @@ def dynamics(
     vel_dot = forces_sum / mass
 
     # Rotational equation of motion
-    torques_sum = torques_motor_vec
     if dist_t is not None:
-        torques_sum = torques_sum + rot.apply(dist_t, inverse=True)
+        torque = torque + rot.apply(dist_t, inverse=True)
     quat_dot = rotation.ang_vel2quat_dot(quat, ang_vel)
-    ang_vel_dot = J_inv @ (torques_sum - xp.linalg.cross(ang_vel, J @ ang_vel))
-
+    torque = torque - xp.linalg.cross(ang_vel, (J @ ang_vel[..., None])[..., 0])
+    ang_vel_dot = (J_inv @ torque[..., None])[..., 0]
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
 

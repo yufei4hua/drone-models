@@ -1,3 +1,5 @@
+"""SoRpyRotorDrag model parameters."""
+
 from __future__ import annotations
 
 import tomllib
@@ -11,6 +13,8 @@ if TYPE_CHECKING:
 
 
 class SoRpyRotorDragParams(NamedTuple):
+    """Parameters for the SoRpyRotorDrag model."""
+
     mass: float
     gravity_vec: Array
     KF: Array
@@ -28,6 +32,7 @@ class SoRpyRotorDragParams(NamedTuple):
 
     @staticmethod
     def load(drone_model: str) -> SoRpyRotorDragParams:
+        """Load the parameters for the drone model from the params.toml file."""
         with open(Path(__file__).parent / "params.toml", "rb") as f:
             params = tomllib.load(f)
         if drone_model not in params:

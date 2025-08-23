@@ -98,7 +98,6 @@ pytest-timeout = ">=2.1.0"
 pytest-cov = ">=6.0.0"
 casadi = ">=3.7.0"
 array-api-strict = ">=2.4.1"
-pytorch = { version = ">=2.5", build = "cuda12*" }
 
 # Adding jax as feature dependency is in conflict with the scipy dependency in the main project
 # because we are installing a preview version. Reaffirming the dependency on scipy makes jax and the

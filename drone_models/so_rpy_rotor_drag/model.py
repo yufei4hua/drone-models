@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING
 
 import casadi as cs
 from array_api_compat import array_namespace
+from array_api_compat import device as xp_device
 from scipy.spatial.transform import Rotation as R
 
 import drone_models.symbols as symbols
 from drone_models.core import register_model_parameters, supports
 from drone_models.so_rpy_rotor_drag.params import SoRpyRotorDragParams
 from drone_models.transform import motor_force2rotor_vel
-from drone_models.utils import rotation
+from drone_models.utils import rotation, to_xp
 
 if TYPE_CHECKING:
     from array_api_typing import Array
@@ -28,17 +28,17 @@ def dynamics(
     quat: Array,
     vel: Array,
     ang_vel: Array,
-    command: Array,
+    cmd: Array,
     rotor_vel: Array | None = None,
     dist_f: Array | None = None,
     dist_t: Array | None = None,
     *,
     mass: float,
     gravity_vec: Array,
-    KF: Array,
-    KM: Array,
     J: Array,
     J_inv: Array,
+    KF: Array,
+    KM: Array,
     rotor_coef: Array,
     acc_coef: Array,
     cmd_f_coef: Array,
@@ -55,32 +55,57 @@ def dynamics(
         quat: Quaternion of the drone (xyzw).
         vel: Velocity of the drone (m/s).
         ang_vel: Angular velocity of the drone (rad/s).
-        command: Roll pitch yaw (rad) and collective thrust (N) command.
-        constants: Containing the constants of the drone.
+        cmd: Roll pitch yaw (rad) and collective thrust (N) command.
         rotor_vel: Speed of the 4 motors (rad/s). If None, the commanded thrust is directly
             applied (not recommended). If value is given, rotor dynamics are calculated.
         dist_f: Disturbance force (N) acting on the CoM.
         dist_t: Disturbance torque (Nm) acting on the CoM.
 
+        mass: Mass of the drone (kg).
+        gravity_vec: Gravity vector (m/s^2). We assume the gravity vector points downwards, e.g.
+            [0, 0, -9.81].
+        J: Inertia matrix (kg m^2).
+        J_inv: Inverse inertia matrix (1/kg m^2).
+        KF: Motor force constant (N/rad^2).
+        KM: Motor torque constant (Nm/rad^2).
+        rotor_coef: Coefficient for the rotor dynamics (1/s).
+        acc_coef: Coefficient for the acceleration (1/s^2).
+        cmd_f_coef: Coefficient for the collective thrust (N/rad^2).
+        rpy_coef: Coefficient for the roll pitch yaw dynamics (1/s).
+        rpy_rates_coef: Coefficient for the roll pitch yaw rates dynamics (1/s^2).
+        cmd_rpy_coef: Coefficient for the roll pitch yaw command dynamics (1/s).
+        drag_linear_coef: Coefficient for the linear drag (1/s).
+        drag_abs_linear_coef: Coefficient for the absolute linear drag (1/s).
+
     Returns:
         The derivatives of all state variables.
     """
     xp = array_namespace(pos)
-    cmd_f = command[..., -1]
+    device = xp_device(pos)
+    # Convert constants to the correct framework and device
+    mass, gravity_vec, KF, KM, J, J_inv = to_xp(
+        mass, gravity_vec, KF, KM, J, J_inv, xp=xp, device=device
+    )
+    rotor_coef, acc_coef, cmd_f_coef = to_xp(rotor_coef, acc_coef, cmd_f_coef, xp=xp, device=device)
+    rpy_coef, rpy_rates_coef, cmd_rpy_coef = to_xp(
+        rpy_coef, rpy_rates_coef, cmd_rpy_coef, xp=xp, device=device
+    )
+    drag_linear_coef, drag_abs_linear_coef = to_xp(
+        drag_linear_coef, drag_abs_linear_coef, xp=xp, device=device
+    )
+    cmd_f = cmd[..., -1]
     cmd_rotor_vel = motor_force2rotor_vel(cmd_f / 4, KF)
-    cmd_rpy = command[..., 0:3]
+    cmd_rpy = cmd[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
 
     if rotor_vel is None:
-        rotor_vel_dot = None
-        rotor_vel = cmd_rotor_vel
-        warnings.warn("Rotor velocity is not provided, using commanded rotor velocity directly.")
+        rotor_vel, rotor_vel_dot = cmd_rotor_vel[..., None], None
     else:
         rotor_vel_dot = 1 / rotor_coef * (cmd_rotor_vel[..., None] - rotor_vel) - KM * rotor_vel**2
-    forces_motor = xp.sum(KF * rotor_vel**2, axis=-1)
-    forces_sum = xp.sum(forces_motor, axis=-1)
-    thrust = acc_coef + cmd_f_coef * forces_sum
+
+    forces_motor = KF * xp.sum(rotor_vel**2, axis=-1)
+    thrust = acc_coef + cmd_f_coef * forces_motor
 
     drone_z_axis = rot.inv().as_matrix()[..., -1, :]
 
@@ -103,11 +128,11 @@ def dynamics(
         # adding torque disturbances to the state
         # angular acceleration can be converted to total torque given the inertia matrix
         torque = ang_vel_dot @ J.mT + xp.linalg.cross(ang_vel, ang_vel @ J.mT)
-
         # adding torque
         torque = torque + rot.apply(dist_t, inverse=True)
         # back to angular acceleration
-        ang_vel_dot = J_inv @ (torque - xp.linalg.cross(ang_vel, J @ ang_vel))
+        torque = torque - xp.linalg.cross(ang_vel, (J @ ang_vel[..., None])[..., 0])
+        ang_vel_dot = (J_inv @ torque[..., None])[..., 0]
 
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 

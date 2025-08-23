@@ -1,3 +1,5 @@
+"""First principles model parameters."""
+
 from __future__ import annotations
 
 import tomllib
@@ -11,6 +13,8 @@ if TYPE_CHECKING:
 
 
 class FirstPrinciplesParams(NamedTuple):
+    """Parameters for the FirstPrinciples model."""
+
     thrust_tau: float
     KF: float
     KM: float
@@ -23,6 +27,7 @@ class FirstPrinciplesParams(NamedTuple):
 
     @staticmethod
     def load(drone_model: str) -> FirstPrinciplesParams:
+        """Load the parameters for the drone model from the params.toml file."""
         with open(Path(__file__).parent / "params.toml", "rb") as f:
             params = tomllib.load(f)
         if drone_model not in params:

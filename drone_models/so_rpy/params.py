@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class SoRpyParams(NamedTuple):
-    """TODO."""
+    """Parameters for the SoRpy model."""
 
     mass: float
     gravity_vec: Array
@@ -27,6 +27,7 @@ class SoRpyParams(NamedTuple):
 
     @staticmethod
     def load(drone_model: str) -> SoRpyParams:
+        """Load the parameters for the drone model from the params.toml file."""
         with open(Path(__file__).parent / "params.toml", "rb") as f:
             params = tomllib.load(f)
         if drone_model not in params:
