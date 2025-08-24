@@ -17,13 +17,13 @@ class SoRpyParams(NamedTuple):
 
     mass: float
     gravity_vec: Array
+    J: Array
+    J_inv: Array
     acc_coef: Array
     cmd_f_coef: Array
     rpy_coef: Array
     rpy_rates_coef: Array
     cmd_rpy_coef: Array
-    J: Array
-    J_inv: Array
 
     @staticmethod
     def load(drone_model: str) -> SoRpyParams:

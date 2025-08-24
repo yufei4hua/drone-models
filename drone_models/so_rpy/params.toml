@@ -11,3 +11,33 @@ J = [
     [0.0, 1.68e-5, 0.0],
     [0.0, 0.0, 2.98e-5]
 ]
+
+# TODO: Check if parameters are correct
+[cf2x_P250]
+mass = 0.03454
+gravity_vec = [0.0, 0.0, -9.81]
+J = [
+    [1.4e-5, 0.0,    0.0],
+    [0.0, 1.4e-5, 0.0],
+    [0.0, 0.0, 2.17e-5]
+]
+acc_coef = 20.907574256269616  
+cmd_f_coef = 3.653687545690674
+rpy_coef = [-99.94, -130.3, 0.0]
+rpy_rates_coef = [-13.3, -16.33, 0.0]
+cmd_rpy_coef = [84.73, 119.3, 0.0]
+
+# TODO: Check if parameters are correct
+[cf2x_T350]
+mass = 0.03454
+gravity_vec = [0.0, 0.0, -9.81]
+J = [
+    [1.4e-5, 0.0,    0.0],
+    [0.0, 1.4e-5, 0.0],
+    [0.0, 0.0, 2.17e-5]
+]
+acc_coef = 20.907574256269616
+cmd_f_coef = 3.653687545690674
+rpy_coef = [-99.94, -130.3, 0.0]
+rpy_rates_coef = [-13.3, -16.33, 0.0]
+cmd_rpy_coef = [84.73, 119.3, 0.0]

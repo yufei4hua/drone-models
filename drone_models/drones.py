@@ -3,4 +3,4 @@
 TODO: Add description.
 """
 
-available_drones: tuple[str] = ("cf2x_L250",)
+available_drones: tuple[str] = ("cf2x_L250", "cf2x_P250", "cf2x_T350")

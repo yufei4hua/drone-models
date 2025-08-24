@@ -15,15 +15,15 @@ if TYPE_CHECKING:
 class FirstPrinciplesParams(NamedTuple):
     """Parameters for the FirstPrinciples model."""
 
-    thrust_tau: float
+    mass: float
+    gravity_vec: Array
+    J: Array
+    J_inv: Array
     KF: float
     KM: float
     L: float
     mixing_matrix: Array
-    gravity_vec: Array
-    mass: float
-    J: Array
-    J_inv: Array
+    thrust_tau: float
 
     @staticmethod
     def load(drone_model: str) -> FirstPrinciplesParams:

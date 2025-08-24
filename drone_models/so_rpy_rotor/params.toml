@@ -1,16 +1,52 @@
 [cf2x_L250]
 mass = 0.033
 gravity_vec = [0.0, 0.0, -9.81]
-KF = 8.701227710666256e-10
-KM = 7.94e-12
 J = [
     [1.68e-5, 0.0, 0.0],
     [0.0, 1.68e-5, 0.0],
     [0.0, 0.0, 2.98e-5]
 ]
+KF = 8.701227710666256e-10
+KM = 7.94e-12
 rotor_coef = 0.1108
 acc_coef = 0.0
 cmd_f_coef = 1.0591
 rpy_coef = [-257.2, -257.2, -225.3]
 rpy_rates_coef = [-20.2, -20.2, -28.61]
 cmd_rpy_coef = [207.1, 207.1, 392.7]
+
+# TODO: Check if parameters are correct
+[cf2x_P250]
+mass = 0.03454
+gravity_vec = [0.0, 0.0, -9.81]
+J = [
+    [1.4e-5, 0.0,    0.0],
+    [0.0, 1.4e-5, 0.0],
+    [0.0, 0.0, 2.17e-5]
+]
+KF = 5.792654323957372e-10
+KM = 7.94e-12
+rotor_coef = 0.0654
+acc_coef = 0.1670
+cmd_f_coef = 0.5615
+rpy_coef = [-286.2, -286.2, -192.9]
+rpy_rates_coef = [-23.03, -23.03, -22.22]
+cmd_rpy_coef = [225.6, 225.6, 323.5]
+
+# TODO: Check if parameters are correct
+[cf2x_T350]
+mass = 0.03253
+gravity_vec = [0.0, 0.0, -9.81]
+J = [
+    [1.4e-5, 0.0,    0.0],
+    [0.0, 1.4e-5, 0.0],
+    [0.0, 0.0, 2.17e-5]
+]
+KF = 1.068340683985525e-09
+KM = 7.94e-12
+rotor_coef = 0.0654
+acc_coef = 0.1670
+cmd_f_coef = 0.5615
+rpy_coef = [-286.2, -286.2, -192.9]
+rpy_rates_coef = [-23.03, -23.03, -22.22]
+cmd_rpy_coef = [225.6, 225.6, 323.5]

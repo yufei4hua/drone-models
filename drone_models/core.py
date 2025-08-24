@@ -89,7 +89,9 @@ def parametrize(
         if xp is not None:  # Convert to any array API framework
             params = named_tuple2xp(params, xp=xp, device=device)
     except KeyError as e:
-        raise KeyError(f"Model `{model_id}` does not exist in the parameter registry") from e
+        raise KeyError(
+            f"Model `{model_id}` does not exist in the parameter registry for drone `{drone_model}`"
+        ) from e
     except ValueError as e:
         raise ValueError(f"Drone model `{drone_model}` not supported for `{model_id}`") from e
     return partial(fn, **params._asdict())

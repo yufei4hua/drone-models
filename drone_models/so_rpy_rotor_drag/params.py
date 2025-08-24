@@ -17,10 +17,10 @@ class SoRpyRotorDragParams(NamedTuple):
 
     mass: float
     gravity_vec: Array
-    KF: Array
-    KM: Array
     J: Array
     J_inv: Array
+    KF: Array
+    KM: Array
     rotor_coef: Array
     acc_coef: Array
     cmd_f_coef: Array
