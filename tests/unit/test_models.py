@@ -15,7 +15,7 @@ from array_api_compat import device as xp_device
 
 from drone_models import available_models, model_features
 from drone_models.core import parametrize
-from drone_models.utils.constants import available_drone_types
+from drone_models.drones import available_drones
 
 if TYPE_CHECKING:
     from array_api_typing import Array
@@ -78,7 +78,7 @@ def test_model_features(model_name: str, model: Callable):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_type", available_drone_types)
+@pytest.mark.parametrize("drone_type", available_drones)
 def test_model_single_no_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
     pos, quat, vel, ang_vel, _, _, _ = create_rnd_states()
     model = parametrize(model, drone_type)
@@ -96,7 +96,7 @@ def test_model_single_no_rotor_dynamics(model_name: str, model: Callable, drone_
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_type", available_drone_types)
+@pytest.mark.parametrize("drone_type", available_drones)
 def test_model_single_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
     skip_models_without_features(model, ["rotor_dynamics"])
     model = parametrize(model, drone_type)
@@ -113,7 +113,7 @@ def test_model_single_rotor_dynamics(model_name: str, model: Callable, drone_typ
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_type", available_drone_types)
+@pytest.mark.parametrize("drone_type", available_drones)
 def test_model_single_external_wrench(model_name: str, model: Callable, drone_type: str):
     model = parametrize(model, drone_type)
     pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t = create_rnd_states()
@@ -130,7 +130,7 @@ def test_model_single_external_wrench(model_name: str, model: Callable, drone_ty
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_type", available_drone_types)
+@pytest.mark.parametrize("drone_type", available_drones)
 def test_model_batched_no_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
     model = parametrize(model, drone_type)
     batch_shape = (10, 5)
@@ -149,7 +149,7 @@ def test_model_batched_no_rotor_dynamics(model_name: str, model: Callable, drone
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_type", available_drone_types)
+@pytest.mark.parametrize("drone_type", available_drones)
 def test_model_batched_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
     skip_models_without_features(model, ["rotor_dynamics"])
     model = parametrize(model, drone_type)
@@ -167,7 +167,7 @@ def test_model_batched_rotor_dynamics(model_name: str, model: Callable, drone_ty
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_type", available_drone_types)
+@pytest.mark.parametrize("drone_type", available_drones)
 def test_model_batched_external_wrench(model_name: str, model: Callable, drone_type: str):
     model = parametrize(model, drone_type)
 
@@ -188,7 +188,7 @@ def test_model_batched_external_wrench(model_name: str, model: Callable, drone_t
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_type", available_drone_types)
+@pytest.mark.parametrize("drone_type", available_drones)
 def test_symbolic_dynamics(model_name: str, model: Callable, drone_type: str):
     symbolic_dynamics = getattr(sys.modules[model.__module__], "symbolic_dynamics")
     symbolic_dynamics = parametrize(symbolic_dynamics, drone_type)
@@ -227,7 +227,7 @@ def test_symbolic_dynamics(model_name: str, model: Callable, drone_type: str):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_type", available_drone_types)
+@pytest.mark.parametrize("drone_type", available_drones)
 def test_symbolic_dynamics_external_wrench(model_name: str, model: Callable, drone_type: str):
     symbolic_dynamics = getattr(sys.modules[model.__module__], "symbolic_dynamics")
     symbolic_dynamics = parametrize(symbolic_dynamics, drone_type)
@@ -275,7 +275,7 @@ def test_symbolic_dynamics_external_wrench(model_name: str, model: Callable, dro
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_type", available_drone_types)
+@pytest.mark.parametrize("drone_type", available_drones)
 def test_compare_batched_non_batched(model_name: str, model: Callable, drone_type: str):
     """Tests if batching works and if the results are identical to the non-batched version."""
     model = parametrize(model, drone_type)
@@ -307,7 +307,7 @@ def test_compare_batched_non_batched(model_name: str, model: Callable, drone_typ
 
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_type", available_drone_types)
+@pytest.mark.parametrize("drone_type", available_drones)
 def test_numeric_jit(model_name: str, model: Callable, drone_type: str):
     """Tests if the models are jitable and if the results are identical to the array API ones."""
     model = parametrize(model, drone_type)
