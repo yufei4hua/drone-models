@@ -15,7 +15,7 @@ from array_api_compat import device as xp_device
 
 from drone_models import available_models, model_features
 from drone_models.core import parametrize
-from drone_models.utils.constants import Constants, available_drone_types
+from drone_models.utils.constants import available_drone_types
 
 if TYPE_CHECKING:
     from array_api_typing import Array
@@ -189,19 +189,19 @@ def test_model_batched_external_wrench(model_name: str, model: Callable, drone_t
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
 @pytest.mark.parametrize("drone_type", available_drone_types)
-def test_symbolic2numeric_no_external_wrench(model_name: str, model: Callable, drone_type: str):
+def test_symbolic_dynamics(model_name: str, model: Callable, drone_type: str):
+    symbolic_dynamics = getattr(sys.modules[model.__module__], "symbolic_dynamics")
+    symbolic_dynamics = parametrize(symbolic_dynamics, drone_type)
+    model = parametrize(model, drone_type)
+
     batch_shape = (10, 5)
     pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states(batch_shape)
     if not model_features(model)["rotor_dynamics"]:
         rotor_vel = None
-    cmd = create_rnd_commands(batch_shape, dim=4)  # TODO make dependent on model
+    cmd = create_rnd_commands(batch_shape, dim=4)
 
-    # Create numeric model from symbolic model
-    dynamics_symbolic = getattr(sys.modules[model.__module__], "dynamics_symbolic")
-    X_dot, X, U, _ = dynamics_symbolic(
-        Constants.from_config(drone_type, np),
-        calc_rotor_vel=True if rotor_vel is not None else False,
-    )
+    # Create symbolic model from dynamics
+    X_dot, X, U, _ = symbolic_dynamics(model_rotor_vel=rotor_vel is not None)
     model_symbolic2numeric = cs.Function(model_name, [X, U], [X_dot])
 
     for i in np.ndindex(np.shape(pos)[:-1]):  # casadi only supports non batched calls
@@ -211,27 +211,12 @@ def test_symbolic2numeric_no_external_wrench(model_name: str, model: Callable, d
             vel[i + (...,)],
             ang_vel[i + (...,)],
             cmd[i + (...,)],
-            Constants.from_config(drone_type, xp),
             rotor_vel=rotor_vel[i + (...,)] if rotor_vel is not None else None,
         )
         x_dot = xp.concat([x for x in x_dot if x is not None], axis=-1)
-
-        if rotor_vel is not None:
-            X = xp.concat(
-                (
-                    pos[i + (...,)],
-                    quat[i + (...,)],
-                    vel[i + (...,)],
-                    ang_vel[i + (...,)],
-                    rotor_vel[i + (...,)],
-                ),
-                axis=-1,
-            )
-        else:
-            X = xp.concat(
-                (pos[i + (...,)], quat[i + (...,)], vel[i + (...,)], ang_vel[i + (...,)]), axis=-1
-            )
-
+        X = xp.concat(
+            [x[i + (...,)] for x in [pos, quat, vel, ang_vel, rotor_vel] if x is not None], axis=-1
+        )
         U = cmd[i + (...,)]
         x_dot_symbolic2numeric = xp.asarray(model_symbolic2numeric(np.asarray(X), np.asarray(U)))
         x_dot_symbolic2numeric = xp.squeeze(x_dot_symbolic2numeric, axis=-1)
@@ -243,7 +228,11 @@ def test_symbolic2numeric_no_external_wrench(model_name: str, model: Callable, d
 @pytest.mark.unit
 @pytest.mark.parametrize("model_name, model", available_models.items())
 @pytest.mark.parametrize("drone_type", available_drone_types)
-def test_symbolic2numeric_external_wrench(model_name: str, model: Callable, drone_type: str):
+def test_symbolic_dynamics_external_wrench(model_name: str, model: Callable, drone_type: str):
+    symbolic_dynamics = getattr(sys.modules[model.__module__], "symbolic_dynamics")
+    symbolic_dynamics = parametrize(symbolic_dynamics, drone_type)
+    model = parametrize(model, drone_type)
+
     batch_shape = (10, 5)
     pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t = create_rnd_states(batch_shape)
     if not model_features(model)["rotor_dynamics"]:
@@ -251,12 +240,8 @@ def test_symbolic2numeric_external_wrench(model_name: str, model: Callable, dron
     cmd = create_rnd_commands(batch_shape, dim=4)  # TODO make dependent on model
 
     # Create numeric model from symbolic model
-    dynamics_symbolic = getattr(sys.modules[model.__module__], "dynamics_symbolic")
-    X_dot, X, U, _ = dynamics_symbolic(
-        Constants.from_config(drone_type, np),
-        calc_rotor_vel=True if rotor_vel is not None else False,
-        calc_dist_f=True,
-        calc_dist_t=True,
+    X_dot, X, U, _ = symbolic_dynamics(
+        model_rotor_vel=rotor_vel is not None, model_dist_f=True, model_dist_t=True
     )
     model_symbolic2numeric = cs.Function(model_name, [X, U], [X_dot])
 
@@ -267,39 +252,19 @@ def test_symbolic2numeric_external_wrench(model_name: str, model: Callable, dron
             vel[i + (...,)],
             ang_vel[i + (...,)],
             cmd[i + (...,)],
-            Constants.from_config(drone_type, xp),
             rotor_vel=rotor_vel[i + (...,)] if rotor_vel is not None else None,
             dist_f=dist_f[i + (...,)],
             dist_t=dist_t[i + (...,)],
         )
         x_dot = xp.concat([x for x in x_dot if x is not None], axis=-1)
-
-        if rotor_vel is not None:
-            X = xp.concat(
-                (
-                    pos[i + (...,)],
-                    quat[i + (...,)],
-                    vel[i + (...,)],
-                    ang_vel[i + (...,)],
-                    rotor_vel[i + (...,)],
-                    dist_f[i + (...,)],
-                    dist_t[i + (...,)],
-                ),
-                axis=-1,
-            )
-        else:
-            X = xp.concat(
-                (
-                    pos[i + (...,)],
-                    quat[i + (...,)],
-                    vel[i + (...,)],
-                    ang_vel[i + (...,)],
-                    dist_f[i + (...,)],
-                    dist_t[i + (...,)],
-                ),
-                axis=-1,
-            )
-
+        X = xp.concat(
+            [
+                x[i + (...,)]
+                for x in [pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t]
+                if x is not None
+            ],
+            axis=-1,
+        )
         U = cmd[i + (...,)]
         x_dot_symbolic2numeric = xp.asarray(model_symbolic2numeric(np.asarray(X), np.asarray(U)))
         x_dot_symbolic2numeric = xp.squeeze(x_dot_symbolic2numeric, axis=-1)

@@ -114,34 +114,35 @@ def dynamics(
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
 
-def dynamics_symbolic(
-    calc_rotor_vel: bool = True,
-    calc_dist_f: bool = False,
-    calc_dist_t: bool = False,
+@register_model_parameters(FirstPrinciplesParams)
+def symbolic_dynamics(
+    model_rotor_vel: bool = True,
+    model_dist_f: bool = False,
+    model_dist_t: bool = False,
     *,
-    thrust_tau: float,
+    mass: float,
+    gravity_vec: Array,
+    J: Array,
+    J_inv: Array,
     KF: float,
     KM: float,
     L: float,
-    sign_matrix: Array,
-    gravity_vec: Array,
-    mass: float,
-    J: Array,
-    J_inv: Array,
+    mixing_matrix: Array,
+    thrust_tau: float,
 ) -> tuple[cs.MX, cs.MX, cs.MX, cs.MX]:
     """TODO take from numeric."""
     # States and Inputs
     X = cs.vertcat(symbols.pos, symbols.quat, symbols.vel, symbols.ang_vel)
-    if calc_rotor_vel:
+    if model_rotor_vel:
         X = cs.vertcat(X, symbols.rotor_vel)
-    if calc_dist_f:
+    if model_dist_f:
         X = cs.vertcat(X, symbols.dist_f)
-    if calc_dist_t:
+    if model_dist_t:
         X = cs.vertcat(X, symbols.dist_t)
     U = symbols.cmd_rotor_vel
 
     # Defining the dynamics function
-    if calc_rotor_vel:
+    if model_rotor_vel:
         # Thrust dynamics
         rotor_vel_dot = 1 / thrust_tau * (U - symbols.rotor_vel) - 1 / KM * symbols.rotor_vel**2
         forces_motor = KF * symbols.rotor_vel**2
@@ -150,12 +151,12 @@ def dynamics_symbolic(
 
     # Creating force and torque vector
     forces_motor_vec = cs.vertcat(0, 0, cs.sum1(forces_motor))
-    torques_motor_vec = forces_motor @ sign_matrix * cs.vertcat(L, L, KM / KF)
+    torques_motor_vec = (forces_motor.T @ mixing_matrix).T * cs.vertcat(L, L, KM / KF)
 
     # Linear equation of motion
     forces_motor_vec_world = symbols.rot @ forces_motor_vec
     forces_sum = forces_motor_vec_world + gravity_vec * mass
-    if calc_dist_f is True:
+    if model_dist_f:
         forces_sum = forces_sum + symbols.dist_f
 
     pos_dot = symbols.vel
@@ -167,11 +168,11 @@ def dynamics_symbolic(
     )
     quat_dot = 0.5 * (xi @ symbols.quat)
     torques_sum = torques_motor_vec
-    if calc_dist_t:
+    if model_dist_t:
         torques_sum = torques_sum + symbols.rot.T @ symbols.dist_t
     ang_vel_dot = J_inv @ (torques_sum - cs.cross(symbols.ang_vel, J @ symbols.ang_vel))
 
-    if calc_rotor_vel:
+    if model_rotor_vel:
         X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot)
     else:
         X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot)
