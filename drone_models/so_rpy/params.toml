@@ -1,3 +1,4 @@
+# TODO: Double-check yaw parameters. Currently induces weird behavior in sim
 [cf2x_L250]
 mass = 0.03454
 gravity_vec = [0.0, 0.0, -9.81]

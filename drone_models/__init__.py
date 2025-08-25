@@ -19,10 +19,14 @@ if "scipy" in sys.modules and os.environ.get("SCIPY_ARRAY_API") != "1":
 os.environ["SCIPY_ARRAY_API"] = "1"
 import scipy  # noqa: F401, ensure scipy uses array API features
 
+from drone_models.core import parametrize
 from drone_models.first_principles import dynamics as _first_principles_dynamics
 from drone_models.so_rpy import dynamics as _so_rpy_dynamics
 from drone_models.so_rpy_rotor import dynamics as _so_rpy_rotor_dynamics
 from drone_models.so_rpy_rotor_drag import dynamics as _so_rpy_rotor_drag_dynamics
+
+__all__ = ["parametrize", "available_models", "model_features"]
+
 
 available_models: dict[str, Callable] = {
     "first_principles": _first_principles_dynamics,
