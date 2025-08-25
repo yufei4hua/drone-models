@@ -16,6 +16,10 @@ from array_api_compat import device as xp_device
 from drone_models import available_models, model_features
 from drone_models.core import parametrize
 from drone_models.drones import available_drones
+from drone_models.first_principles import dynamics as first_principle_dynamics
+from drone_models.so_rpy import dynamics as so_rpy_dynamics
+from drone_models.so_rpy_rotor import dynamics as so_rpy_rotor_dynamics
+from drone_models.so_rpy_rotor_drag import dynamics as so_rpy_rotor_drag_dynamics
 
 if TYPE_CHECKING:
     from array_api_typing import Array
@@ -41,16 +45,19 @@ def create_rnd_commands(shape: tuple[int, ...] = (), dim: int = 4) -> Array:
     return xp.abs(xp.asarray(np.random.randn(*shape, dim)))  # Motor forces must be positive
 
 
-def assert_array_meta(x: Array | None, y: Array | None):
+def assert_array_meta(x: Array | None, y: Array | None, name: str | None = None):
     """Assert the output is on the correct device, has the correct type and shape."""
     if x is None and y is None:
         return
-    assert isinstance(x, type(y)), f"Output type {type(x)} does not match expected {type(y)}"
-    assert xp_device(x) == xp_device(y), (
-        f"Output device {xp_device(x)} does not match expected {xp_device(y)}"
+    prefix = "" if name is None else f"{name}: "
+    assert isinstance(x, type(y)), (
+        f"{prefix}Output type {type(x)} does not match expected {type(y)}"
     )
-    assert x.shape == y.shape, f"Output shape {x.shape} does not match expected {y.shape}"
-    assert np.all(np.isnan(x) == np.isnan(y)), "Derivative of non-nan values are NaN"
+    assert xp_device(x) == xp_device(y), (
+        f"{prefix}Output device {xp_device(x)} does not match expected {xp_device(y)}"
+    )
+    assert x.shape == y.shape, f"{prefix}Output shape {x.shape} does not match expected {y.shape}"
+    assert np.all(np.isnan(x) == np.isnan(y)), f"{prefix}Derivative of non-nan values are NaN"
 
 
 def skip_models_without_features(model: Callable, features: list[str]):
@@ -58,6 +65,31 @@ def skip_models_without_features(model: Callable, features: list[str]):
     for feature in features:
         if not model_features(model)[feature]:
             pytest.skip(f"Model {model.__name__} does not have the feature '{feature}'.")
+
+
+def assert_dynamics_shapes(
+    dynamics: Callable,
+    batch: int[...] = (),
+    rotor_vel_input: bool = False,
+    ext_force_torque: bool = False,
+):
+    pos, quat, vel, ang_vel, rotor_vel, f_ext, t_ext = create_rnd_states(shape=batch)
+    cmd = create_rnd_commands(shape=batch, dim=4)
+    if not rotor_vel_input:
+        rotor_vel = None
+    if not ext_force_torque:
+        f_ext, t_ext = None, None
+    dpos, dquat, dvel, dang_vel, drotor_vel = dynamics(
+        pos, quat, vel, ang_vel, cmd, rotor_vel, f_ext, t_ext
+    )
+    # Check if the output is on the correct device, has the correct type and shape
+    for name, dx, x in zip(
+        ["dpos", "dquat", "dvel", "dang_vel", "drotor_vel"],
+        [dpos, dquat, dvel, dang_vel, drotor_vel],
+        [pos, quat, vel, ang_vel, rotor_vel],
+        strict=True,
+    ):
+        assert_array_meta(dx, x, name=name)
 
 
 @pytest.mark.unit
@@ -77,113 +109,179 @@ def test_model_features(model_name: str, model: Callable):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("model_name, model", available_models.items())
 @pytest.mark.parametrize("drone_type", available_drones)
-def test_model_single_no_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
-    pos, quat, vel, ang_vel, _, _, _ = create_rnd_states()
-    model = parametrize(model, drone_type)
-    cmd = create_rnd_commands(dim=4)  # TODO make dependent on model
-    if model_features(model)["rotor_dynamics"]:
-        with pytest.warns(UserWarning, match="Rotor velocity not provided"):
-            dpos, dquat, dvel, dang_vel, drotor_vel = model(pos, quat, vel, ang_vel, cmd)
-    else:
-        dpos, dquat, dvel, dang_vel, drotor_vel = model(pos, quat, vel, ang_vel, cmd)
-    assert drotor_vel is None, "Model should not return rotor velocities without rotor_vel input"
-    # Check if the output is on the correct device, has the correct type and shape
-    for dx, x in zip([dpos, dquat, dvel, dang_vel], [pos, quat, vel, ang_vel], strict=True):
-        assert_array_meta(dx, x)
+def test_first_principle_dynamics(drone_type: str):
+    dynamics = parametrize(first_principle_dynamics, drone_type)
+    assert model_features(dynamics)["rotor_dynamics"], "Model should support rotor dynamics"
+
+    assert_dynamics_shapes(dynamics, rotor_vel_input=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, rotor_vel_input=False)
+
+    # External force-torque
+    assert_dynamics_shapes(dynamics, rotor_vel_input=True, ext_force_torque=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, rotor_vel_input=False, ext_force_torque=True)
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("model_name, model", available_models.items())
 @pytest.mark.parametrize("drone_type", available_drones)
-def test_model_single_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
-    skip_models_without_features(model, ["rotor_dynamics"])
-    model = parametrize(model, drone_type)
+def test_first_principle_dynamics_batched(drone_type: str):
+    dynamics = parametrize(first_principle_dynamics, drone_type, xp=xp)
+    assert model_features(dynamics)["rotor_dynamics"], "Model should support rotor dynamics"
 
-    pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states()
-    cmd = create_rnd_commands(dim=4)
-    dpos, dquat, dvel, dang_vel, drotor_vel = model(pos, quat, vel, ang_vel, cmd, rotor_vel)
-    # Check if the output is on the correct device, has the correct type and shape
-    for dx, x in zip(
-        [dpos, dquat, dvel, dang_vel, drotor_vel], [pos, quat, vel, ang_vel, rotor_vel], strict=True
-    ):
-        assert_array_meta(dx, x)
+    shape = (10, 5)
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False)
 
+    # External force-torque
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=True, ext_force_torque=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False, ext_force_torque=True)
 
-@pytest.mark.unit
-@pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_type", available_drones)
-def test_model_single_external_wrench(model_name: str, model: Callable, drone_type: str):
-    model = parametrize(model, drone_type)
-    pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t = create_rnd_states()
-    if not model_features(model)["rotor_dynamics"]:
-        rotor_vel = None
-    cmd = create_rnd_commands(dim=4)  # TODO make dependent on model
-    dpos, dquat, dvel, dang_vel, drotor_vel = model(
-        pos, quat, vel, ang_vel, cmd, rotor_vel, dist_f, dist_t
+    # Batch params
+    dynamics.keywords["J"] = xp.tile(dynamics.keywords["J"][None, None, ...], shape + (1, 1))
+    dynamics.keywords["J_inv"] = xp.tile(
+        dynamics.keywords["J_inv"][None, None, ...], shape + (1, 1)
     )
-    # Check if the output is on the correct device, has the correct type and shape
-    for dx, x in zip([dpos, dquat, dvel, dang_vel], [pos, quat, vel, ang_vel], strict=True):
-        assert_array_meta(dx, x)
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False)
+
+    # External force-torque
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=True, ext_force_torque=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False, ext_force_torque=True)
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("model_name, model", available_models.items())
 @pytest.mark.parametrize("drone_type", available_drones)
-def test_model_batched_no_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
-    model = parametrize(model, drone_type)
-    batch_shape = (10, 5)
-    pos, quat, vel, ang_vel, _, _, _ = create_rnd_states(batch_shape)
-    cmd = create_rnd_commands(batch_shape, dim=4)  # TODO make dependent on model
-    if model_features(model)["rotor_dynamics"]:
-        with pytest.warns(UserWarning, match="Rotor velocity not provided"):
-            dpos, dquat, dvel, dang_vel, drotor_vel = model(pos, quat, vel, ang_vel, cmd, None)
-    else:
-        dpos, dquat, dvel, dang_vel, drotor_vel = model(pos, quat, vel, ang_vel, cmd, None)
-    assert drotor_vel is None, "Model should not return rotor velocities without rotor_vel input"
-    # Check if the output is on the correct device, has the correct type and shape
-    for dx, x in zip([dpos, dquat, dvel, dang_vel], [pos, quat, vel, ang_vel], strict=True):
-        assert_array_meta(dx, x)
+def test_so_rpy(drone_type: str):
+    dynamics = parametrize(so_rpy_dynamics, drone_type)
+    assert not model_features(dynamics)["rotor_dynamics"], "Model should not support rotor dynamics"
+
+    assert_dynamics_shapes(dynamics, rotor_vel_input=False)
+
+    # External force-torque
+    assert_dynamics_shapes(dynamics, rotor_vel_input=False, ext_force_torque=True)
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("model_name, model", available_models.items())
 @pytest.mark.parametrize("drone_type", available_drones)
-def test_model_batched_rotor_dynamics(model_name: str, model: Callable, drone_type: str):
-    skip_models_without_features(model, ["rotor_dynamics"])
-    model = parametrize(model, drone_type)
+def test_so_rpy_batched(drone_type: str):
+    dynamics = parametrize(so_rpy_dynamics, drone_type, xp=xp)
+    assert not model_features(dynamics)["rotor_dynamics"], "Model should not support rotor dynamics"
 
-    batch_shape = (10, 5)
-    pos, quat, vel, ang_vel, rotor_vel, _, _ = create_rnd_states(batch_shape)
-    cmd = create_rnd_commands(batch_shape, dim=4)
-    dpos, dquat, dvel, dang_vel, drotor_vel = model(pos, quat, vel, ang_vel, cmd, rotor_vel)
-    # Check if the output is on the correct device, has the correct type and shape
-    for dx, x in zip(
-        [dpos, dquat, dvel, dang_vel, drotor_vel], [pos, quat, vel, ang_vel, rotor_vel], strict=True
-    ):
-        assert_array_meta(dx, x)
+    shape = (10, 5)
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False)
 
+    # External force-torque
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False, ext_force_torque=True)
 
-@pytest.mark.unit
-@pytest.mark.parametrize("model_name, model", available_models.items())
-@pytest.mark.parametrize("drone_type", available_drones)
-def test_model_batched_external_wrench(model_name: str, model: Callable, drone_type: str):
-    model = parametrize(model, drone_type)
-
-    batch_shape = (10, 5)
-    pos, quat, vel, ang_vel, rotor_vel, dist_f, dist_t = create_rnd_states(batch_shape)
-    if not model_features(model)["rotor_dynamics"]:
-        rotor_vel = None
-    cmd = create_rnd_commands(batch_shape, dim=4)  # TODO make dependent on model
-    dpos, dquat, dvel, dang_vel, drotor_vel = model(
-        pos, quat, vel, ang_vel, cmd, rotor_vel, dist_f=dist_f, dist_t=dist_t
+    # Batch params
+    dynamics.keywords["J"] = xp.tile(dynamics.keywords["J"][None, None, ...], shape + (1, 1))
+    dynamics.keywords["J_inv"] = xp.tile(
+        dynamics.keywords["J_inv"][None, None, ...], shape + (1, 1)
     )
-    # Check if the output is on the correct device, has the correct type and shape
-    for dx, x in zip(
-        [dpos, dquat, dvel, dang_vel, drotor_vel], [pos, quat, vel, ang_vel, rotor_vel], strict=True
-    ):
-        assert_array_meta(dx, x)
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False)
+
+    # External force-torque
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False, ext_force_torque=True)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("drone_type", available_drones)
+def test_so_rpy_rotor(drone_type: str):
+    dynamics = parametrize(so_rpy_rotor_dynamics, drone_type)
+    assert model_features(dynamics)["rotor_dynamics"], "Model should support rotor dynamics"
+
+    assert_dynamics_shapes(dynamics, rotor_vel_input=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, rotor_vel_input=False)
+
+    # External force-torque
+    assert_dynamics_shapes(dynamics, rotor_vel_input=True, ext_force_torque=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, rotor_vel_input=False, ext_force_torque=True)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("drone_type", available_drones)
+def test_so_rpy_rotor_batched(drone_type: str):
+    dynamics = parametrize(so_rpy_rotor_dynamics, drone_type, xp=xp)
+    assert model_features(dynamics)["rotor_dynamics"], "Model should support rotor dynamics"
+
+    shape = (10, 5)
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False)
+
+    # External force-torque
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=True, ext_force_torque=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False, ext_force_torque=True)
+
+    # Batch params
+    dynamics.keywords["J"] = xp.tile(dynamics.keywords["J"][None, None, ...], shape + (1, 1))
+    dynamics.keywords["J_inv"] = xp.tile(
+        dynamics.keywords["J_inv"][None, None, ...], shape + (1, 1)
+    )
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False)
+
+    # External force-torque
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=True, ext_force_torque=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False, ext_force_torque=True)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("drone_type", available_drones)
+def test_so_rpy_rotor_drag(drone_type: str):
+    dynamics = parametrize(so_rpy_rotor_drag_dynamics, drone_type)
+    assert model_features(dynamics)["rotor_dynamics"], "Model should support rotor dynamics"
+
+    assert_dynamics_shapes(dynamics, rotor_vel_input=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, rotor_vel_input=False)
+
+    # External force-torque
+    assert_dynamics_shapes(dynamics, rotor_vel_input=True, ext_force_torque=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, rotor_vel_input=False, ext_force_torque=True)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("drone_type", available_drones)
+def test_so_rpy_rotor_drag_batched(drone_type: str):
+    dynamics = parametrize(so_rpy_rotor_drag_dynamics, drone_type, xp=xp)
+    assert model_features(dynamics)["rotor_dynamics"], "Model should support rotor dynamics"
+
+    shape = (10, 5)
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False)
+
+    # External force-torque
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=True, ext_force_torque=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False, ext_force_torque=True)
+
+    # Batch params
+    dynamics.keywords["J"] = xp.tile(dynamics.keywords["J"][None, None, ...], shape + (1, 1))
+    dynamics.keywords["J_inv"] = xp.tile(
+        dynamics.keywords["J_inv"][None, None, ...], shape + (1, 1)
+    )
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False)
+
+    # External force-torque
+    assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=True, ext_force_torque=True)
+    with pytest.warns(UserWarning, match="Rotor velocity not provided"):
+        assert_dynamics_shapes(dynamics, batch=shape, rotor_vel_input=False, ext_force_torque=True)
 
 
 @pytest.mark.unit

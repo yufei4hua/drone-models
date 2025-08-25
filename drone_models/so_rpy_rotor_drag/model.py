@@ -125,8 +125,10 @@ def dynamics(
     if dist_t is not None:
         # adding torque disturbances to the state
         # angular acceleration can be converted to total torque given the inertia matrix
-        torque = ang_vel_dot @ J.mT + xp.linalg.cross(ang_vel, ang_vel @ J.mT)
-        # adding torque
+        torque = (J @ ang_vel_dot[..., None])[..., 0]
+        torque = torque + xp.linalg.cross(ang_vel, (J @ ang_vel[..., None])[..., 0])
+        # adding torque. TODO: This should be a linear transformation. Can't we just transform the
+        # disturbance torque to an ang_vel_dot summand directly?
         torque = torque + rot.apply(dist_t, inverse=True)
         # back to angular acceleration
         torque = torque - xp.linalg.cross(ang_vel, (J @ ang_vel[..., None])[..., 0])
