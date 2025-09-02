@@ -6,7 +6,7 @@ $$
 
 Drone models @ LSY. Contains symbolic (CasADi) and numeric (ArrayAPI, i.e., NumPy, JAX, ...) versions as well as meshes of each model.
 
-[![Python Version]][Python Version URL] [![Ruff Check]][Ruff Check URL] [![Tests]][Tests URL]
+[![Python Version]][Python Version URL] [![Ruff Check]][Ruff Check URL] [![Tests]][Tests URL] [![Docs]][Docs URL]
 
 [Python Version]: https://img.shields.io/badge/python-3.10+-blue.svg
 [Python Version URL]: https://www.python.org
