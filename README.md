@@ -17,6 +17,9 @@ Drone models @ LSY. Contains symbolic (CasADi) and numeric (ArrayAPI, i.e., NumP
 [Tests]: https://github.com/utiasDSL/drone-models/actions/workflows/testing.yml/badge.svg
 [Tests URL]: https://github.com/utiasDSL/drone-models/actions/workflows/testing.yml
 
+[Docs]: https://github.com/utiasDSL/drone-models/actions/workflows/docs.yml/badge.svg
+[Docs URL]: https://utiasdsl.github.io/drone-models/
+
 ## Installation
 
 1. Clone repository `git clone git@github.com:utiasDSL/drone-models.git`
