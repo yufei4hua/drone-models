@@ -50,11 +50,11 @@ def dynamics(
         quat: Quaternion of the drone (xyzw).
         vel: Velocity of the drone (m/s).
         ang_vel: Angular velocity of the drone (rad/s).
-        cmd: Motor speeds (rad/s).
-        rotor_vel: Angular velocity of the 4 motors (rad/s). If None, the commanded thrust is
+        cmd: Motor speeds (RPMs).
+        rotor_vel: Angular velocity of the 4 motors (RPMs). If None, the commanded thrust is
             directly applied. If value is given, thrust dynamics are calculated.
-        dist_f: Disturbance force acting on the CoM (N).
-        dist_t: Disturbance torque acting on the CoM (Nm).
+        dist_f: Disturbance force (N) in the world frame acting on the CoM.
+        dist_t: Disturbance torque (Nm) in the world frame acting on the CoM.
 
         mass: Mass of the drone (kg).
         gravity_vec: Gravity vector (m/s^2). We assume the gravity vector points downwards, e.g.
@@ -84,17 +84,13 @@ def dynamics(
     if rotor_vel is None:
         rotor_vel, rotor_vel_dot = cmd, None
     else:
-        rotor_vel_dot = 1 / thrust_tau * (cmd - rotor_vel) - 1 / KM * rotor_vel**2
+        rotor_vel_dot = 1 / thrust_tau * (cmd - rotor_vel)  # - 1 / KM * rotor_vel**2
     # Creating force and torque vector
     forces_motor = KF * rotor_vel**2
     forces_motor_tot = xp.sum(forces_motor, axis=-1)
     zeros = xp.zeros_like(forces_motor_tot)
     forces_motor_vec = xp.stack((zeros, zeros, forces_motor_tot), axis=-1)
-    # Torques in x & y are simply the force x distance.
-    # Because there currently is no way to identify the z torque in relation to the thrust,
-    # we rely on a old identified value that can compute rpm to torque.
-    # force = kf * rpm², torque = km * rpm² => torque = km/kf*force TODO
-    torque = forces_motor @ mixing_matrix * xp.stack([L, L, KM / KF])
+    torque = (mixing_matrix @ (rotor_vel**2)[..., None])[..., 0] * xp.stack([KF * L, KF * L, KM])
 
     # Linear equation of motion
     forces_motor_vec_world = rot.apply(forces_motor_vec)
@@ -144,14 +140,14 @@ def symbolic_dynamics(
     # Defining the dynamics function
     if model_rotor_vel:
         # Thrust dynamics
-        rotor_vel_dot = 1 / thrust_tau * (U - symbols.rotor_vel) - 1 / KM * symbols.rotor_vel**2
+        rotor_vel_dot = 1 / thrust_tau * (U - symbols.rotor_vel)  # - 1 / KM * symbols.rotor_vel**2
         forces_motor = KF * symbols.rotor_vel**2
     else:
         forces_motor = KF * U**2
 
     # Creating force and torque vector
     forces_motor_vec = cs.vertcat(0, 0, cs.sum1(forces_motor))
-    torques_motor_vec = (forces_motor.T @ mixing_matrix).T * cs.vertcat(L, L, KM / KF)
+    torques_motor_vec = mixing_matrix @ forces_motor * cs.vertcat(L, L, KM / KF)
 
     # Linear equation of motion
     forces_motor_vec_world = symbols.rot @ forces_motor_vec

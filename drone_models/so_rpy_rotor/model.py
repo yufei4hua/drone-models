@@ -52,10 +52,10 @@ def dynamics(
         vel: Velocity of the drone (m/s).
         ang_vel: Angular velocity of the drone (rad/s).
         cmd: Roll pitch yaw (rad) and collective thrust (N) command.
-        rotor_vel: Speed of the 4 motors (rad/s). If None, the commanded thrust is directly
+        rotor_vel: Speed of the 4 motors (RPMs). If None, the commanded thrust is directly
             applied (not recommended). If value is given, rotor dynamics are calculated.
-        dist_f: Disturbance force acting on the CoM (N).
-        dist_t: Disturbance torque acting on the CoM (Nm).
+        dist_f: Disturbance force (N) in the world frame acting on the CoM.
+        dist_t: Disturbance torque (Nm) in the world frame acting on the CoM.
 
         mass: Mass of the drone (kg).
         gravity_vec: Gravity vector (m/s^2). We assume the gravity vector points downwards, e.g.
