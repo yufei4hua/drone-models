@@ -12,7 +12,6 @@ from scipy.spatial.transform import Rotation as R
 import drone_models.symbols as symbols
 from drone_models.core import register_model_parameters, supports
 from drone_models.so_rpy_rotor_drag.params import SoRpyRotorDragParams
-from drone_models.transform import motor_force2rotor_vel
 from drone_models.utils import rotation, to_xp
 
 if TYPE_CHECKING:
