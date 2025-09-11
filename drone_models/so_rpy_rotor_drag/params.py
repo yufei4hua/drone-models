@@ -21,14 +21,14 @@ class SoRpyRotorDragParams(NamedTuple):
     J_inv: Array
     KF: Array
     KM: Array
-    rotor_coef: Array
+    thrust_time_coef: Array
     acc_coef: Array
     cmd_f_coef: Array
     rpy_coef: Array
     rpy_rates_coef: Array
     cmd_rpy_coef: Array
     drag_linear_coef: Array
-    drag_abs_linear_coef: Array
+    drag_square_coef: Array
 
     @staticmethod
     def load(drone_model: str) -> SoRpyRotorDragParams:
