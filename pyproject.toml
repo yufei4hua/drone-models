@@ -15,6 +15,7 @@ classifiers = [
 
 dependencies = [
     "numpy>=2.0.0",
+    "casadi>=3.7.0",
     "array-api-compat",
     "scipy @ git+https://github.com/scipy/scipy.git@4cb83b6",               # TODO: Replace with scipy 1.17 once released
     "array-api-typing @ git+https://github.com/data-apis/array-api-typing", # TODO: Replace with array-api-typing from pip once released
@@ -96,7 +97,6 @@ drone_models = { path = ".", editable = true }
 pytest = ">=8.4.1"
 pytest-timeout = ">=2.1.0"
 pytest-cov = ">=6.0.0"
-casadi = ">=3.7.0"
 array-api-strict = ">=2.4.1"
 
 # Adding jax as feature dependency is in conflict with the scipy dependency in the main project
