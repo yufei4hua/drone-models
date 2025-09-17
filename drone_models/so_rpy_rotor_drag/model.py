@@ -106,7 +106,7 @@ def dynamics(
             1 / thrust_time_coef * (cmd_rotor_vel[..., None] - rotor_vel)
         )  # - KM * rotor_vel**2
 
-    forces_motor = KF * xp.sum(rotor_vel**2, axis=-1)
+    # forces_motor = KF * xp.sum(rotor_vel**2, axis=-1)
     forces_motor = rotor_vel[..., 0]
     thrust = acc_coef + cmd_f_coef * forces_motor
 
