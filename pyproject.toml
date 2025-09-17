@@ -26,7 +26,7 @@ dependencies = [
 find = {}
 
 [tool.setuptools.package-data]
-drone_models = ["data/*.xml"]
+drone_models = ["data/*.xml", "**/*.toml"]
 
 [tool.pytest.ini_options]
 markers = ["unit", "integration", "render"]
