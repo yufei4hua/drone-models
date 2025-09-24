@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import tomllib
 import warnings
 from functools import partial, wraps
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, ParamSpec, Protocol, TypeVar, runtime_checkable
+
+import numpy as np
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -138,18 +142,27 @@ def register_model_parameters(
     return decorator
 
 
-# def load_xml_params(drone_model: str) -> dict[str, Array]:
-#     """TODO.
+def load_params(physics: str, drone_model: str, xp: ModuleType | None = None) -> dict:
+    """TODO.
 
-#     Args:
-#         model (str): _description_
+    Args:
+        physics: _description_
+        drone_model: _description_
+        xp: The array API module to use. If not provided, numpy is used.
 
-#     Returns:
-#         dict[str, Array]: _description_
-#     """
-#     drone_path = Path(__file__).parents[1] / path
-#     # read in all parameters from xml
-#     params = ET.parse(drone_path).findall(".//custom/numeric")
-#     # create a dict from parameters containing array of floats
-#     params = {p.get("name"): np.array(list(map(float, p.get("data").split()))) for p in params}
-#     return params
+    Returns:
+        dict[str, Array]: _description_
+    """
+    xp = np if xp is None else xp
+    with open(Path(__file__).parent / "data/params.toml", "rb") as f:
+        physical_params = tomllib.load(f)
+    if drone_model not in physical_params:
+        raise KeyError(f"Drone model `{drone_model}` not found in data/params.toml")
+    with open(Path(__file__).parent / f"{physics}/params.toml", "rb") as f:
+        model_params = tomllib.load(f)
+    if drone_model not in model_params:
+        raise KeyError(f"Drone model `{drone_model}` not found in model params.toml")
+    params = physical_params[drone_model] | model_params[drone_model]
+    params["J_inv"] = np.linalg.inv(params["J"])
+    params = {k: xp.asarray(v) for k, v in params.items()}  # if k in fields
+    return params
