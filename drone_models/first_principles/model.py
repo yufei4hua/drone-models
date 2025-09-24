@@ -2,23 +2,22 @@
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING
 
 import casadi as cs
-from array_api_compat import array_namespace
+from array_api_compat import array_namespace, device
 from scipy.spatial.transform import Rotation as R
 
-import drone_models.models.symbols as symbols
-from drone_models.models.utils import supports
-from drone_models.utils import rotation
+import drone_models.symbols as symbols
+from drone_models.core import register_model_parameters, supports
+from drone_models.first_principles.params import FirstPrinciplesParams
+from drone_models.utils import rotation, to_xp
 
 if TYPE_CHECKING:
     from array_api_typing import Array
 
-    from drone_models.utils.constants import Constants
 
-
+@register_model_parameters(FirstPrinciplesParams)
 @supports(rotor_dynamics=True)
 def dynamics(
     pos: Array,
@@ -26,10 +25,19 @@ def dynamics(
     vel: Array,
     ang_vel: Array,
     cmd: Array,
-    constants: Constants,
     rotor_vel: Array | None = None,
     dist_f: Array | None = None,
     dist_t: Array | None = None,
+    *,
+    mass: float,
+    gravity_vec: Array,
+    J: Array,
+    J_inv: Array,
+    KF: float,
+    KM: float,
+    L: float,
+    mixing_matrix: Array,
+    thrust_tau: float,
 ) -> tuple[Array, Array, Array, Array, Array | None]:
     r"""First principles model for a quatrotor.
 
@@ -42,12 +50,22 @@ def dynamics(
         quat: Quaternion of the drone (xyzw).
         vel: Velocity of the drone (m/s).
         ang_vel: Angular velocity of the drone (rad/s).
-        cmd: Motor speeds (rad/s).
-        constants: Containing the constants of the drone.
-        rotor_vel: Angular velocity of the 4 motors (rad/s). If None, the commanded thrust is
+        cmd: Motor speeds (RPMs).
+        rotor_vel: Angular velocity of the 4 motors (RPMs). If None, the commanded thrust is
             directly applied. If value is given, thrust dynamics are calculated.
-        dist_f: Disturbance force acting on the CoM (N).
-        dist_t: Disturbance torque acting on the CoM (Nm).
+        dist_f: Disturbance force (N) in the world frame acting on the CoM.
+        dist_t: Disturbance torque (Nm) in the world frame acting on the CoM.
+
+        mass: Mass of the drone (kg).
+        gravity_vec: Gravity vector (m/s^2). We assume the gravity vector points downwards, e.g.
+            [0, 0, -9.81].
+        J: Inertia matrix (kg m^2).
+        J_inv: Inverse inertia matrix (1/kg m^2).
+        KF: Motor force constant (N/rad^2).
+        KM: Motor torque constant (Nm/rad^2).
+        L: Distance from the CoM to the motor (m).
+        mixing_matrix: Mixing matrix denoting the turn direction of the motors (4x3).
+        thrust_tau: Thrust time constant (s).
 
     .. math::
         \sum_{i=1}^{\\infty} x_{i} TODO
@@ -58,101 +76,87 @@ def dynamics(
         More information https://ahrs.readthedocs.io/en/latest/filters/angular.html
     """
     xp = array_namespace(pos)
+    mass, gravity_vec, J, J_inv, KF, KM, L, mixing_matrix, thrust_tau = to_xp(
+        mass, gravity_vec, J, J_inv, KF, KM, L, mixing_matrix, thrust_tau, xp=xp, device=device(pos)
+    )
     rot = R.from_quat(quat)
     # Rotor dynamics
     if rotor_vel is None:
-        rotor_vel_dot = None
-        rotor_vel = cmd
-        warnings.warn("Rotor velocity is not provided, using commanded rotor velocity directly.")
+        rotor_vel, rotor_vel_dot = cmd, None
     else:
-        rotor_vel_dot = (
-            1 / constants.THRUST_TAU * (cmd - rotor_vel) - 1 / constants.KM * rotor_vel**2
-        )
+        rotor_vel_dot = 1 / thrust_tau * (cmd - rotor_vel)  # - 1 / KM * rotor_vel**2
     # Creating force and torque vector
-    forces_motor = constants.KF * rotor_vel**2
+    forces_motor = KF * rotor_vel**2
     forces_motor_tot = xp.sum(forces_motor, axis=-1)
     zeros = xp.zeros_like(forces_motor_tot)
     forces_motor_vec = xp.stack((zeros, zeros, forces_motor_tot), axis=-1)
-    # Torques in x & y are simply the force x distance.
-    # Because there currently is no way to identify the z torque in relation to the thrust,
-    # we rely on a old identified value that can compute rpm to torque.
-    # force = kf * rpm², torque = km * rpm² => torque = km/kf*force TODO
-    torques_motor_vec = (
-        forces_motor
-        @ constants.SIGN_MATRIX
-        * xp.stack([constants.L, constants.L, constants.KM / constants.KF])
-    )
+    torque = (mixing_matrix @ (rotor_vel**2)[..., None])[..., 0] * xp.stack([KF * L, KF * L, KM])
 
     # Linear equation of motion
     forces_motor_vec_world = rot.apply(forces_motor_vec)
-    forces_sum = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
+    forces_sum = forces_motor_vec_world + gravity_vec * mass
     if dist_f is not None:
         forces_sum = forces_sum + dist_f
 
     pos_dot = vel
-    vel_dot = forces_sum / constants.MASS
+    vel_dot = forces_sum / mass
 
     # Rotational equation of motion
-    torques_sum = torques_motor_vec
     if dist_t is not None:
-        # print(f"{dist_t.shape=}, {torques.shape=}, {rot.inv().as_matrix().shape=}")
-        # torques = torques + rot.inv().as_matrix()[..., None, :] @ dist_t
-        print(f"{dist_t.shape=}, {torques_sum.shape=}")
-        torques_sum = torques_sum + rot.apply(dist_t, inverse=True)
+        torque = torque + rot.apply(dist_t, inverse=True)
     quat_dot = rotation.ang_vel2quat_dot(quat, ang_vel)
-    ang_vel_dot = (
-        torques_sum - xp.linalg.cross(ang_vel, ang_vel @ constants.J.T)
-    ) @ constants.J_INV.T
-    # TODO: Why ang_vel @ J.T instead of J @ ang_vel?
-    # ang_vel_dot = constants.J_INV @ (torques - xp.linalg.cross(ang_vel, (constants.J @ ang_vel)))
-
+    torque = torque - xp.linalg.cross(ang_vel, (J @ ang_vel[..., None])[..., 0])
+    ang_vel_dot = (J_inv @ torque[..., None])[..., 0]
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
 
-def dynamics_symbolic(
-    constants: Constants,
-    calc_rotor_vel: bool = True,
-    calc_dist_f: bool = False,
-    calc_dist_t: bool = False,
+@register_model_parameters(FirstPrinciplesParams)
+def symbolic_dynamics(
+    model_rotor_vel: bool = True,
+    model_dist_f: bool = False,
+    model_dist_t: bool = False,
+    *,
+    mass: float,
+    gravity_vec: Array,
+    J: Array,
+    J_inv: Array,
+    KF: float,
+    KM: float,
+    L: float,
+    mixing_matrix: Array,
+    thrust_tau: float,
 ) -> tuple[cs.MX, cs.MX, cs.MX, cs.MX]:
     """TODO take from numeric."""
     # States and Inputs
     X = cs.vertcat(symbols.pos, symbols.quat, symbols.vel, symbols.ang_vel)
-    if calc_rotor_vel:
+    if model_rotor_vel:
         X = cs.vertcat(X, symbols.rotor_vel)
-    if calc_dist_f:
+    if model_dist_f:
         X = cs.vertcat(X, symbols.dist_f)
-    if calc_dist_t:
+    if model_dist_t:
         X = cs.vertcat(X, symbols.dist_t)
     U = symbols.cmd_rotor_vel
 
     # Defining the dynamics function
-    if calc_rotor_vel:
+    if model_rotor_vel:
         # Thrust dynamics
-        rotor_vel_dot = (
-            1 / constants.THRUST_TAU * (U - symbols.rotor_vel)
-            - 1 / constants.KM * symbols.rotor_vel**2
-        )
-        forces_motor = constants.KF * symbols.rotor_vel**2
+        rotor_vel_dot = 1 / thrust_tau * (U - symbols.rotor_vel)  # - 1 / KM * symbols.rotor_vel**2
+        forces_motor = KF * symbols.rotor_vel**2
     else:
-        forces_motor = constants.KF * U**2
+        forces_motor = KF * U**2
 
     # Creating force and torque vector
     forces_motor_vec = cs.vertcat(0, 0, cs.sum1(forces_motor))
-    torques_motor_vec = (
-        constants.SIGN_MATRIX.T
-        @ forces_motor
-        * cs.vertcat(constants.L, constants.L, constants.KM / constants.KF)
-    )
+    torques_motor_vec = mixing_matrix @ forces_motor * cs.vertcat(L, L, KM / KF)
 
     # Linear equation of motion
     forces_motor_vec_world = symbols.rot @ forces_motor_vec
-    forces_sum = forces_motor_vec_world + constants.GRAVITY_VEC * constants.MASS
-    if calc_dist_f is True:
+    forces_sum = forces_motor_vec_world + gravity_vec * mass
+    if model_dist_f:
         forces_sum = forces_sum + symbols.dist_f
 
     pos_dot = symbols.vel
-    vel_dot = forces_sum / constants.MASS
+    vel_dot = forces_sum / mass
 
     # Rotational equation of motion
     xi = cs.vertcat(
@@ -160,13 +164,11 @@ def dynamics_symbolic(
     )
     quat_dot = 0.5 * (xi @ symbols.quat)
     torques_sum = torques_motor_vec
-    if calc_dist_t:
+    if model_dist_t:
         torques_sum = torques_sum + symbols.rot.T @ symbols.dist_t
-    ang_vel_dot = constants.J_INV @ (
-        torques_sum - cs.cross(symbols.ang_vel, constants.J @ symbols.ang_vel)
-    )
+    ang_vel_dot = J_inv @ (torques_sum - cs.cross(symbols.ang_vel, J @ symbols.ang_vel))
 
-    if calc_rotor_vel:
+    if model_rotor_vel:
         X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot)
     else:
         X_dot = cs.vertcat(pos_dot, quat_dot, vel_dot, ang_vel_dot)

@@ -26,7 +26,7 @@ def motor_force2rotor_vel(motor_forces: Array, kf: float | Array) -> Array:
         Array of rotor velocities in rad/s with shape (..., N).
     """
     xp = array_namespace(motor_forces)
-    return xp.sqrt(motor_forces / kf)
+    return xp.where(motor_forces == 0, 0, xp.sqrt(motor_forces / kf))
 
 
 def rotor_vel2body_force(rotor_vel: Array, kf: float | Array) -> Array:
