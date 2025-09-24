@@ -9,15 +9,13 @@ from array_api_compat import array_namespace, device
 from scipy.spatial.transform import Rotation as R
 
 import drone_models.symbols as symbols
-from drone_models.core import register_model_parameters, supports
-from drone_models.so_rpy.params import SoRpyParams
+from drone_models.core import supports
 from drone_models.utils import rotation, to_xp
 
 if TYPE_CHECKING:
     from array_api_typing import Array
 
 
-@register_model_parameters(SoRpyParams)
 @supports(rotor_dynamics=False)
 def dynamics(
     pos: Array,
@@ -108,7 +106,6 @@ def dynamics(
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
 
-@register_model_parameters(SoRpyParams)
 def symbolic_dynamics(
     model_rotor_vel: bool = False,
     model_dist_f: bool = False,
