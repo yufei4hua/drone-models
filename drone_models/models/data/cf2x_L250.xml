@@ -1,6 +1,24 @@
 <mujoco model="cf2">
   <compiler inertiafromgeom="false" meshdir="assets" autolimits="true" />
-  <include file="assets.xml" />
+
+  <asset>
+    <material name="black" rgba="0.102 0.102 0.102 1"/>
+    <material name="gray" rgba="0.3 0.3 0.3 1"/>
+    <material name="light-gray" rgba="0.7 0.7 0.7 1"/>
+    <material name="silver" rgba="0.898 0.898 0.898 1"/>
+    <material name="white" rgba="1 1 1 0.3"/>
+    <material name="gold" rgba="0.969 0.878 0.6 1"/>
+
+    <mesh name="pcb" file="cf2x/cf2x_pcb.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="motors" file="cf2x/cf2xL_motors.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="motor-holder" file="cf2x/cf2x_motor-holder.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="propL" file="cf2x/cf2xL_PropL.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="propR" file="cf2x/cf2xL_PropR.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="connectors" file="cf2x/cf2x_connectors.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="connector-pins" file="cf2x/cf2x_connector-pins.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="battery" file="cf2x/cf2x_battery.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="battery-holder" file="cf2x/cf2x_battery-holder.stl" scale="0.001 0.001 0.001"/>
+  </asset>
 
   <default>
     <default class="cf2">
@@ -18,13 +36,13 @@
     <body name="drone" pos="0 0 0.05" childclass="cf2">
       <inertial pos="0.0 0.0 0.0" mass="0.027" diaginertia="2.3951e-5 2.3951e-5 3.2347e-5" />
       <camera name="track" pos="-1 0 .5" xyaxes="0 -1 0 1 0 2" mode="trackcom" />
-      <geom mesh="cf2_0" material="propeller_plastic" class="visual" />
-      <geom mesh="cf2_1" material="medium_gloss_plastic" class="visual" />
-      <geom mesh="cf2_2" material="polished_gold" class="visual" />
-      <geom mesh="cf2_3" material="polished_plastic" class="visual" />
-      <geom mesh="cf2_4" material="burnished_chrome" class="visual" />
-      <geom mesh="cf2_5" material="body_frame_plastic" class="visual" />
-      <geom mesh="cf2_6" material="white" class="visual" />
+      <geom mesh="pcb" material="gray" class="visual" />
+      <geom mesh="motors" material="silver" class="visual" />
+      <geom mesh="motor-holder" material="white" class="visual" />
+      <geom mesh="connectors" material="black" class="visual" />
+      <geom mesh="connector-pins" material="gold" class="visual" />
+      <geom mesh="battery" material="light-gray" class="visual" />
+      <geom mesh="battery-holder" material="black" class="visual" />
       <!-- Collision geometry is estimated based on the visual mesh. We use a sphere for maximum
        computational efficiency with larger swarms. -->
       <geom type="sphere" size="0.055" class="collision" name="col" />
@@ -33,6 +51,21 @@
       <site name="motor1" pos="-0.0325 -0.0325 0.0" />
       <site name="motor2" pos="-0.0325 0.0325 0.0" />
       <site name="motor3" pos="0.0325 0.0325 0.0" />
+
+      <!-- Propellers -->
+      <body name="prop0" pos="0.0325 -0.0325 0.012" euler="0 0 45">
+        <geom mesh="propL" material="black" class="visual"/>
+      </body>
+      <body name="prop1" pos="-0.0325 -0.0325 0.012" euler="0 0 135">
+        <geom mesh="propR" material="black" class="visual"/>
+      </body>
+      <body name="prop2" pos="-0.0325 0.0325 0.012" euler="0 0 225">
+        <geom mesh="propL" material="black" class="visual"/>
+      </body>
+      <body name="prop3" pos="0.0325 0.0325 0.012" euler="0 0 315">
+        <geom mesh="propR" material="black" class="visual"/>
+      </body>
+
     </body>
   </worldbody>
 
@@ -93,30 +126,6 @@
     <numeric name="p_vmotor2rpm" data="2828.6593993157803 6686.5508078905705" /> <!--Index is order-->
     <numeric name="kf" data="8.701227710666256e-10" />
     <numeric name="km" data="7.94e-12" /> <!-- From old identification! TODO: Replace if possible-->
-
-    <!-- System Idenfication: Simple Model-->
-    <numeric name="SI_roll" data="-12.7 10.15" />
-    <numeric name="SI_pitch" data="-12.7 10.15" />
-    <numeric name="SI_yaw" data="-8.117 14.36" /> 
-    <numeric name="SI_acc" data="0.1906 0.4903" /> <!--Index is order-->
-
-    <!-- System Identification: Double Integrator Model-->
-    <numeric name="DI_roll" data="-286.2 -23.03 225.6" />
-    <numeric name="DI_pitch" data="-286.2 -23.03 225.6" />
-    <numeric name="DI_yaw" data="-192.9 -22.22 323.5" /> 
-    <numeric name="DI_acc" data="0.0 1.0633" /> <!--Index is order-->
-
-    <!-- System Identification: Double Integrator Model with delay-->
-    <numeric name="DI_D_roll" data="-257.2 -20.2 207.1" />
-    <numeric name="DI_D_pitch" data="-257.2 -20.2 207.1" />
-    <numeric name="DI_D_yaw" data="-225.3 -28.61 392.7" /> 
-    <numeric name="DI_D_acc" data="0.0 1.0591 0.1108" /> <!--Index is order, tau is last-->
-
-    <!-- System Identification: Double Integrator Model with drag and delay-->
-    <numeric name="DI_DD_roll" data="-257.2 -20.2 207.1" />
-    <numeric name="DI_DD_pitch" data="-257.2 -20.2 207.1" />
-    <numeric name="DI_DD_yaw" data="-225.3 -28.61 392.7" /> 
-    <numeric name="DI_DD_acc" data="1.0627 0.1891 -0.0177 0.0010" /> <!--c1, tau, c2, c3-->
 
   </custom>
 
