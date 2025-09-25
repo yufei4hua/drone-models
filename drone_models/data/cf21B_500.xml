@@ -2,7 +2,6 @@
   <compiler inertiafromgeom="false" meshdir="assets" autolimits="true" />
 
   <asset>
-    
     <material name="black" rgba="0.102 0.102 0.102 1"/>
     <material name="gray" rgba="0.3 0.3 0.3 1"/>
     <material name="light-gray" rgba="0.7 0.7 0.7 1"/>
@@ -11,20 +10,16 @@
     <material name="gold" rgba="0.969 0.878 0.6 1"/>
     <material name="green" rgba="0.522 0.902 0.145 1"/>
 
-    <material name="polished_plastic" rgba="0.631 0.659 0.678 1"/>
-    <material name="medium_gloss_plastic" rgba="0.109 0.184 0.0 1"/>
-
-    <mesh name="pcb" file="cf21B/cf21B_pcb.stl" scale="0.001 0.001 0.001"/>
-    <mesh name="motors" file="cf21B/cf21B_motors.stl" scale="0.001 0.001 0.001"/>
-    <mesh name="propL" file="cf21B/cf21B_PropL.stl" scale="0.001 0.001 0.001"/>
-    <mesh name="propR" file="cf21B/cf21B_PropR.stl" scale="0.001 0.001 0.001"/>
-    <mesh name="prop-guards" file="cf21B/cf21B_prop-guards.stl" scale="0.001 0.001 0.001"/>
-    <mesh name="connectors" file="cf21B/cf21B_connectors.stl" scale="0.001 0.001 0.001"/>
-    <mesh name="connector-pins" file="cf21B/cf21B_connector-pins.stl" scale="0.001 0.001 0.001"/>
-    <mesh name="battery" file="cf21B/cf21B_battery.stl" scale="0.001 0.001 0.001"/>
-    <mesh name="battery-holder" file="cf21B/cf21B_battery-holder.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="pcb" file="cf21B/cf21B_pcb.stl" scale="1e-3 1e-3 1e-3"/>
+    <mesh name="motors" file="cf21B/cf21B_motors.stl" scale="1e-3 1e-3 1e-3"/>
+    <mesh name="propL" file="cf21B/cf21B_PropL.stl" scale="1e-3 1e-3 1e-3"/>
+    <mesh name="propR" file="cf21B/cf21B_PropR.stl" scale="1e-3 1e-3 1e-3"/>
+    <mesh name="prop-guards" file="cf21B/cf21B_prop-guards.stl" scale="1e-3 1e-3 1e-3"/>
+    <mesh name="connectors" file="cf21B/cf21B_connectors.stl" scale="1e-3 1e-3 1e-3"/>
+    <mesh name="connector-pins" file="cf21B/cf21B_connector-pins.stl" scale="1e-3 1e-3 1e-3"/>
+    <mesh name="battery" file="cf21B/cf21B_battery.stl" scale="1e-3 1e-3 1e-3"/>
+    <mesh name="battery-holder" file="cf21B/cf21B_battery-holder.stl" scale="1e-3 1e-3 1e-3"/>
   </asset>
-
 
   <default>
     <default class="cf2">
@@ -40,7 +35,7 @@
 
   <worldbody>
     <body name="drone" pos="0 0 0.05" childclass="cf2">
-      <inertial pos="0.0 0.0 0.0" mass="0.027" diaginertia="2.3951e-5 2.3951e-5 3.2347e-5" />
+      <inertial pos="0.0 0.0 0.0" mass="0.04338" diaginertia="2.3951e-5 2.3951e-5 3.2347e-5" />
       <camera name="track" pos="-1 0 .5" xyaxes="0 -1 0 1 0 2" mode="trackcom" />
       <geom mesh="pcb" material="gray" class="visual" />
       <geom mesh="motors" material="black" class="visual" />
@@ -89,46 +84,5 @@
     <motor gear="0 0 0 0 0 1" site="motor2" name="motor2_torque" />
     <motor gear="0 0 0 0 0 1" site="motor3" name="motor3_torque" />
   </actuator>
-
-  <!-- Model Parameters
-  Below are all the parameters unique to the drone setup
-  Base is the Crazyflie 2.X, file name encodes the specific setup
-  - Propellers/Motors options: L(egacy), P(lus), T(hrust upgrade kit), B(rushless) 
-  - Battery (250mAh / 350mAh / 500mAh)
-  -->
-  <custom>
-    <!-- Physical Parameters-->
-    <numeric name="gravity" data="9.807" /> <!-- Munich, Germany-->
-    <numeric name="mass" data="0.03454" /> <!-- From identification for L250! TODO: Redo -->
-    <numeric name="J" data="1.4e-5 0.0    0.0 
-                            0.0    1.4e-5 0.0
-                            0.0    0.0    2.17e-5"/> <!-- From IROS 2022 -->
-    <!-- <numeric name="J" data="1.68e-5 0.0    0.0 
-                            0.0    1.68e-5 0.0
-                            0.0    0.0    2.98e-5" />  --> <!-- From Förster B.S. thesis -->
-    <!-- Distance of motor from axis 
-         in x configuration, it's 1/sqrt(2) smaller 
-         arm "+" = 0.05 (from CAD); arm "x" = 0.035355 (rounded)-->
-    <numeric name="arm" data="0.035355" />
-    <!-- Matrix on how to mix the forces into torques, different for "x" and "+" config-->
-    <numeric name="sign_matrix" data="-1 -1 -1 
-                                      -1  1  1 
-                                       1  1 -1 
-                                       1 -1  1" />
-    <numeric name="prop_radius" data="2.31348e-2" />
-
-    <!-- Motors and Thrust-->
-    <numeric name="PWM_MIN" data="20000.0" />
-    <numeric name="PWM_MAX" data="65535.0" />
-    <numeric name="THRUST_MIN" data="0.03" /> <!-- in N, per motor-->
-    <numeric name="THRUST_MAX" data="0.1625" /> <!-- in N, per motor-->
-    <numeric name="THRUST_TAU" data="8.719306881898989" />
-    <numeric name="VMOTOR_MIN" data="0.983691398141343" /> <!-- in V-->
-    <numeric name="VMOTOR_MAX" data="2.643523702759344" /> <!-- in V-->
-    <numeric name="p_vmotor2thrust" data="-0.03978221591250353 0.10979738851226176 -0.05545304285403245 0.016215002062640885" /> <!--Index is order-->
-    <numeric name="p_vmotor2rpm" data="2738.439005850152 8054.983767001532" /> <!--Index is order-->
-    <numeric name="kf" data="1.068340683985525e-09" />
-    <numeric name="km" data="7.94e-12" /> <!-- From old identification! TODO: Replace if possible-->
-  </custom>
 
 </mujoco>

@@ -31,8 +31,8 @@ def dynamics(
     gravity_vec: Array,
     J: Array,
     J_inv: Array,
-    KF: float,
-    KM: float,
+    rpm2thrust: Array,
+    rpm2torque: Array,
     L: float,
     mixing_matrix: Array,
     thrust_tau: float,
@@ -59,8 +59,8 @@ def dynamics(
             [0, 0, -9.81].
         J: Inertia matrix (kg m^2).
         J_inv: Inverse inertia matrix (1/kg m^2).
-        KF: Motor force constant (N/rad^2).
-        KM: Motor torque constant (Nm/rad^2).
+        rpm2thrust: Propeller force constant (N min^2).
+        rpm2torque: Propeller torque constant (Nm min^2).
         L: Distance from the CoM to the motor (m).
         mixing_matrix: Mixing matrix denoting the turn direction of the motors (4x3).
         thrust_tau: Thrust time constant (s).
@@ -74,8 +74,18 @@ def dynamics(
         More information https://ahrs.readthedocs.io/en/latest/filters/angular.html
     """
     xp = array_namespace(pos)
-    mass, gravity_vec, J, J_inv, KF, KM, L, mixing_matrix, thrust_tau = to_xp(
-        mass, gravity_vec, J, J_inv, KF, KM, L, mixing_matrix, thrust_tau, xp=xp, device=device(pos)
+    mass, gravity_vec, J, J_inv, rpm2thrust, rpm2torque, L, mixing_matrix, thrust_tau = to_xp(
+        mass,
+        gravity_vec,
+        J,
+        J_inv,
+        rpm2thrust,
+        rpm2torque,
+        L,
+        mixing_matrix,
+        thrust_tau,
+        xp=xp,
+        device=device(pos),
     )
     rot = R.from_quat(quat)
     # Rotor dynamics
@@ -84,11 +94,17 @@ def dynamics(
     else:
         rotor_vel_dot = 1 / thrust_tau * (cmd - rotor_vel)  # - 1 / KM * rotor_vel**2
     # Creating force and torque vector
-    forces_motor = KF * rotor_vel**2
+    forces_motor = rpm2thrust[0] + rpm2thrust[1] * rotor_vel + rpm2thrust[2] * rotor_vel**2
+    torques_motor = rpm2torque[0] + rpm2torque[1] * rotor_vel + rpm2torque[2] * rotor_vel**2
     forces_motor_tot = xp.sum(forces_motor, axis=-1)
     zeros = xp.zeros_like(forces_motor_tot)
     forces_motor_vec = xp.stack((zeros, zeros, forces_motor_tot), axis=-1)
-    torque = (mixing_matrix @ (rotor_vel**2)[..., None])[..., 0] * xp.stack([KF * L, KF * L, KM])
+
+    torque_vec = (mixing_matrix @ (forces_motor)[..., None])[..., 0] * xp.stack(
+        [L, L, xp.asarray(0.0)]
+    ) + (mixing_matrix @ (torques_motor)[..., None])[..., 0] * xp.stack(
+        [xp.asarray(0.0), xp.asarray(0.0), xp.asarray(1.0)]
+    )
 
     # Linear equation of motion
     forces_motor_vec_world = rot.apply(forces_motor_vec)
@@ -101,10 +117,10 @@ def dynamics(
 
     # Rotational equation of motion
     if dist_t is not None:
-        torque = torque + rot.apply(dist_t, inverse=True)
+        torque_vec = torque_vec + rot.apply(dist_t, inverse=True)
     quat_dot = rotation.ang_vel2quat_dot(quat, ang_vel)
-    torque = torque - xp.linalg.cross(ang_vel, (J @ ang_vel[..., None])[..., 0])
-    ang_vel_dot = (J_inv @ torque[..., None])[..., 0]
+    torque_vec = torque_vec - xp.linalg.cross(ang_vel, (J @ ang_vel[..., None])[..., 0])
+    ang_vel_dot = (J_inv @ torque_vec[..., None])[..., 0]
     return pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot
 
 
@@ -117,8 +133,8 @@ def symbolic_dynamics(
     gravity_vec: Array,
     J: Array,
     J_inv: Array,
-    KF: float,
-    KM: float,
+    rpm2thrust: Array,
+    rpm2torque: Array,
     L: float,
     mixing_matrix: Array,
     thrust_tau: float,
@@ -138,13 +154,21 @@ def symbolic_dynamics(
     if model_rotor_vel:
         # Thrust dynamics
         rotor_vel_dot = 1 / thrust_tau * (U - symbols.rotor_vel)  # - 1 / KM * symbols.rotor_vel**2
-        forces_motor = KF * symbols.rotor_vel**2
+        forces_motor = (
+            rpm2thrust[0] + rpm2thrust[1] * symbols.rotor_vel + rpm2thrust[2] * symbols.rotor_vel**2
+        )
+        torques_motor = (
+            rpm2torque[0] + rpm2torque[1] * symbols.rotor_vel + rpm2torque[2] * symbols.rotor_vel**2
+        )
     else:
-        forces_motor = KF * U**2
+        forces_motor = rpm2thrust[0] + rpm2thrust[1] * U + rpm2thrust[2] * U**2
+        torques_motor = rpm2torque[0] + rpm2torque[1] * U + rpm2torque[2] * U**2
 
     # Creating force and torque vector
-    forces_motor_vec = cs.vertcat(0, 0, cs.sum1(forces_motor))
-    torques_motor_vec = mixing_matrix @ forces_motor * cs.vertcat(L, L, KM / KF)
+    forces_motor_vec = cs.vertcat(0.0, 0.0, cs.sum1(forces_motor))
+    torques_motor_vec = mixing_matrix @ forces_motor * cs.vertcat(
+        L, L, 0.0
+    ) + mixing_matrix @ torques_motor * cs.vertcat(0.0, 0.0, 1.0)
 
     # Linear equation of motion
     forces_motor_vec_world = symbols.rot @ forces_motor_vec
