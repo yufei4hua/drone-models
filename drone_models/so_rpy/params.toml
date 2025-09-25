@@ -23,9 +23,9 @@ rpy_rates_coef = [-13.3, -16.33, 0.0]
 cmd_rpy_coef = [84.73, 119.3, 0.0]
 
 # TODO: Check if parameters are correct
-[cf2x_B500]
+[cf21B_500]
 acc_coef = 0.0
-cmd_f_coef = 1.0633
+cmd_f_coef = 0.98323027
 rpy_coef = [-99.94, -130.3, 0.0]
 rpy_rates_coef = [-13.3, -16.33, 0.0]
 cmd_rpy_coef = [84.73, 119.3, 0.0]

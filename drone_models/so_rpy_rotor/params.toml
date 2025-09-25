@@ -23,3 +23,12 @@ cmd_f_coef = 0.5615
 rpy_coef = [-286.2, -286.2, -192.9]
 rpy_rates_coef = [-23.03, -23.03, -22.22]
 cmd_rpy_coef = [225.6, 225.6, 323.5]
+
+
+[cf21B_500]
+thrust_time_coef = 0.03573264
+acc_coef = 0.0
+cmd_f_coef = 0.98372945
+rpy_coef = [-160.5, -160.5, -109.3]
+rpy_rates_coef = [-10.74, -10.74, -13.69]
+cmd_rpy_coef = [115.2, 115.2, 154.6]

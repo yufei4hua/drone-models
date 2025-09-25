@@ -31,7 +31,7 @@ drag_linear_coef = -0.0177
 drag_square_coef = 0.0010
 
 
-[cf2x_B500]
+[cf21B_500]
 thrust_time_coef = 0.08238289
 acc_coef = 0.0
 cmd_f_coef = 0.99509171
