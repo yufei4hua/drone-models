@@ -32,8 +32,6 @@ def dynamics(
     gravity_vec: Array,
     J: Array,
     J_inv: Array,
-    KF: Array,
-    KM: Array,
     thrust_time_coef: Array,
     acc_coef: Array,
     cmd_f_coef: Array,
@@ -61,8 +59,6 @@ def dynamics(
             [0, 0, -9.81].
         J: Inertia matrix (kg m^2).
         J_inv: Inverse inertia matrix (1/kg m^2).
-        KF: Motor force constant (N/rad^2).
-        KM: Motor torque constant (Nm/rad^2).
         thrust_time_coef: Coefficient for the rotor dynamics (1/s).
         acc_coef: Coefficient for the acceleration (1/s^2).
         cmd_f_coef: Coefficient for the collective thrust (N/rad^2).
@@ -78,9 +74,7 @@ def dynamics(
     xp = array_namespace(pos)
     device = xp_device(pos)
     # Convert constants to the correct framework and device
-    mass, gravity_vec, KF, KM, J, J_inv = to_xp(
-        mass, gravity_vec, KF, KM, J, J_inv, xp=xp, device=device
-    )
+    mass, gravity_vec, J, J_inv = to_xp(mass, gravity_vec, J, J_inv, xp=xp, device=device)
     thrust_time_coef, acc_coef, cmd_f_coef = to_xp(
         thrust_time_coef, acc_coef, cmd_f_coef, xp=xp, device=device
     )
@@ -91,20 +85,16 @@ def dynamics(
         drag_linear_coef, drag_square_coef, xp=xp, device=device
     )
     cmd_f = cmd[..., -1]
-    # cmd_rotor_vel = motor_force2rotor_vel(cmd_f / 4, KF)
-    cmd_rotor_vel = cmd_f  # this is just a hack for testing TODO remove
     cmd_rpy = cmd[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
 
+    # Note that we are abusing the rotor_vel state as the thrust
     if rotor_vel is None:
-        rotor_vel, rotor_vel_dot = cmd_rotor_vel[..., None], None
+        rotor_vel, rotor_vel_dot = cmd_f[..., None], None
     else:
-        rotor_vel_dot = (
-            1 / thrust_time_coef * (cmd_rotor_vel[..., None] - rotor_vel)
-        )  # - KM * rotor_vel**2
+        rotor_vel_dot = 1 / thrust_time_coef * (cmd_f[..., None] - rotor_vel)
 
-    # forces_motor = KF * xp.sum(rotor_vel**2, axis=-1)
     forces_motor = rotor_vel[..., 0]
     thrust = acc_coef + cmd_f_coef * forces_motor
 
@@ -149,8 +139,6 @@ def symbolic_dynamics(
     gravity_vec: Array,
     J: Array,
     J_inv: Array,
-    KF: Array,
-    KM: Array,
     thrust_time_coef: Array,
     acc_coef: Array,
     cmd_f_coef: Array,
@@ -176,6 +164,7 @@ def symbolic_dynamics(
     cmd_rpy = cs.vertcat(symbols.cmd_roll, symbols.cmd_pitch, symbols.cmd_yaw)
 
     # Defining the dynamics function
+    # Note that we are abusing the rotor_vel state as the thrust
     if model_rotor_vel:
         # motor_force2rotor_vel
         # cmd_rotor_vel = cs.sqrt(symbols.cmd_thrust / 4 / KF)

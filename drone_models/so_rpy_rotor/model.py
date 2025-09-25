@@ -11,7 +11,6 @@ from scipy.spatial.transform import Rotation as R
 
 import drone_models.symbols as symbols
 from drone_models.core import supports
-from drone_models.transform import motor_force2rotor_vel
 from drone_models.utils import rotation, to_xp
 
 if TYPE_CHECKING:
@@ -33,9 +32,7 @@ def dynamics(
     gravity_vec: Array,
     J: Array,
     J_inv: Array,
-    KF: Array,
-    KM: Array,
-    rotor_coef: Array,
+    thrust_time_coef: Array,
     acc_coef: Array,
     cmd_f_coef: Array,
     rpy_coef: Array,
@@ -60,9 +57,7 @@ def dynamics(
             [0, 0, -9.81].
         J: Inertia matrix (kg m^2).
         J_inv: Inverse inertia matrix (1/kg m^2).
-        KF: Motor force constant (N/rad^2).
-        KM: Motor torque constant (Nm/rad^2).
-        rotor_coef: Coefficient for the rotor dynamics (1/s).
+        thrust_time_coef: Coefficient for the rotor dynamics (1/s).
         acc_coef: Coefficient for the acceleration (1/s^2).
         cmd_f_coef: Coefficient for the collective thrust (N/rad^2).
         rpy_coef: Coefficient for the roll pitch yaw dynamics (1/s).
@@ -75,26 +70,26 @@ def dynamics(
     xp = array_namespace(pos)
     # Convert constants to the correct framework and device
     device = xp_device(pos)
-    mass, gravity_vec, KF, KM, J, J_inv = to_xp(
-        mass, gravity_vec, KF, KM, J, J_inv, xp=xp, device=device
+    mass, gravity_vec, J, J_inv = to_xp(mass, gravity_vec, J, J_inv, xp=xp, device=device)
+    thrust_time_coef, acc_coef, cmd_f_coef = to_xp(
+        thrust_time_coef, acc_coef, cmd_f_coef, xp=xp, device=device
     )
-    rotor_coef, acc_coef, cmd_f_coef = to_xp(rotor_coef, acc_coef, cmd_f_coef, xp=xp, device=device)
     rpy_coef, rpy_rates_coef, cmd_rpy_coef = to_xp(
         rpy_coef, rpy_rates_coef, cmd_rpy_coef, xp=xp, device=device
     )
 
     cmd_f = cmd[..., -1]
-    cmd_rotor_vel = motor_force2rotor_vel(cmd_f / 4, KF)
     cmd_rpy = cmd[..., 0:3]
     rot = R.from_quat(quat)
     euler_angles = rot.as_euler("xyz")
 
+    # Note that we are abusing the rotor_vel state as the thrust
     if rotor_vel is None:
-        rotor_vel, rotor_vel_dot = cmd_rotor_vel[..., None], None
+        rotor_vel, rotor_vel_dot = cmd_f[..., None], None
     else:
-        rotor_vel_dot = 1 / rotor_coef * (cmd_rotor_vel[..., None] - rotor_vel) - KM * rotor_vel**2
+        rotor_vel_dot = 1 / thrust_time_coef * (cmd_f[..., None] - rotor_vel)
 
-    forces_motor = KF * xp.sum(rotor_vel**2, axis=-1)
+    forces_motor = rotor_vel[..., 0]
     thrust = acc_coef + cmd_f_coef * forces_motor
 
     drone_z_axis = rot.as_matrix()[..., -1]
@@ -135,9 +130,7 @@ def symbolic_dynamics(
     gravity_vec: Array,
     J: Array,
     J_inv: Array,
-    KF: Array,
-    KM: Array,
-    rotor_coef: Array,
+    thrust_time_coef: Array,
     acc_coef: Array,
     cmd_f_coef: Array,
     rpy_coef: Array,
@@ -160,13 +153,18 @@ def symbolic_dynamics(
     cmd_rpy = cs.vertcat(symbols.cmd_roll, symbols.cmd_pitch, symbols.cmd_yaw)
 
     # Defining the dynamics function
+    # Note that we are abusing the rotor_vel state as the thrust
     if model_rotor_vel:
         # motor_force2rotor_vel
-        cmd_rotor_vel = cs.sqrt(symbols.cmd_thrust / 4 / KF)
+        # cmd_rotor_vel = cs.sqrt(symbols.cmd_thrust / 4 / KF)
+        cmd_rotor_vel = symbols.cmd_thrust  # this is just a hack for testing TODO remove
         rotor_vel_dot = (
-            1 / rotor_coef * (cmd_rotor_vel - symbols.rotor_vel) - KM * symbols.rotor_vel**2
+            1
+            / thrust_time_coef
+            * (cmd_rotor_vel - symbols.rotor_vel)  # - KM * symbols.rotor_vel**2
         )
-        forces_motor = KF * cs.sum1(symbols.rotor_vel**2)
+        # forces_motor = KF * cs.sum1(symbols.rotor_vel**2)
+        forces_motor = symbols.rotor_vel[0]
     else:
         forces_motor = symbols.cmd_thrust
     # Creating force vector

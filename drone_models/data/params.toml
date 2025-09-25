@@ -1,8 +1,9 @@
 # This file contains all the **physical** parameters for all models.
 
 [cf2x_L250]
-mass = 0.033
 gravity_vec = [0.0, 0.0, -9.81]
+mass = 0.033
+L = 0.03253
 J = [
     [1.68e-5, 0.0, 0.0],
     [0.0, 1.68e-5, 0.0],
@@ -10,20 +11,20 @@ J = [
 ]
 rpm2thrust = [0.0, 0.0, 3.16e-10] # TODO
 rpm2torque = [0.0, 0.0, 7.94e-12] # TODO
-L = 0.03253
+# TODO: This is an arbitrary number that leads to a working simulation. It MUST be fitted and
+# updated as soon as possible.
+thrust_tau = 0.03 # TODO value? TODO rename to rotor_tau
 mixing_matrix = [
     [-1.0, -1.0, 1.0, 1.0],
     [-1.0,  1.0,  1.0, -1.0],
     [-1.0, 1.0,  -1.0, 1.0]
 ]
-# TODO: This is an arbitrary number that leads to a working simulation. It MUST be fitted and
-# updated as soon as possible.
-thrust_tau = 0.03
 
 
 [cf2x_P250]
-mass = 0.03454
 gravity_vec = [0.0, 0.0, -9.81]
+mass = 0.03454
+L = 0.03253
 # J from IROS 2022
 J = [
     [1.4e-5, 0.0,    0.0],
@@ -32,18 +33,18 @@ J = [
 ]
 rpm2thrust = [0.0, 0.0, 5.792654323957372e-10] # TODO
 rpm2torque = [0.0, 0.0, 7.94e-12] # TODO
-L = 0.03253
+thrust_tau = 7.2333515424212695 # TODO value? TODO rename to rotor_tau
 mixing_matrix = [
     [-1.0, -1.0, 1.0, 1.0],
     [-1.0,  1.0,  1.0, -1.0],
     [-1.0, 1.0,  -1.0, 1.0]
 ]
-thrust_tau = 7.2333515424212695
 
 
 [cf2x_T350]
-mass = 0.03454
 gravity_vec = [0.0, 0.0, -9.81]
+mass = 0.03454
+L = 0.03253
 J = [
     [1.4e-5, 0.0,    0.0],
     [0.0, 1.4e-5, 0.0],
@@ -51,18 +52,18 @@ J = [
 ]
 rpm2thrust = [0.0, 0.0, 1.068340683985525e-09] # TODO
 rpm2torque = [0.0, 0.0, 7.94e-12] # TODO
-L = 0.03253
+thrust_tau = 8.719306881898989 # TODO value? TODO rename to rotor_tau
 mixing_matrix = [
     [-1.0, -1.0, 1.0, 1.0],
     [-1.0,  1.0,  1.0, -1.0],
     [-1.0, 1.0,  -1.0, 1.0]
 ]
-thrust_tau = 8.719306881898989
 
 
 [cf21B_500]
-mass = 0.04338
 gravity_vec = [0.0, 0.0, -9.81]
+mass = 0.04338
+L = 0.035355
 J = [
     [2.5e-5, 0.0,    0.0],
     [0.0,    2.8e-5, 0.0],
@@ -70,10 +71,10 @@ J = [
 ]
 rpm2thrust = [0.0, -8.357406697944084e-07, 4.716909960828207e-10]
 rpm2torque = [0.0, 2.435151264350409e-09, 2.424629050055297e-12]
-L = 0.035355
+thrust2torque = 0.00593893393599368
+thrust_tau = 0.08 # TODO value? TODO rename to rotor_tau
 mixing_matrix = [
     [-1.0, -1.0,  1.0,  1.0],
     [-1.0,  1.0,  1.0, -1.0],
     [-1.0,  1.0, -1.0,  1.0]
 ]
-thrust_tau = 0.03 # TODO
