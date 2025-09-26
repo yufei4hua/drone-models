@@ -65,7 +65,6 @@
       <body name="prop3" pos="0.0325 0.0325 0.012" euler="0 0 315">
         <geom mesh="propR" material="black" class="visual"/>
       </body>
-
     </body>
   </worldbody>
 
@@ -84,49 +83,5 @@
     <motor gear="0 0 0 0 0 1" site="motor2" name="motor2_torque" />
     <motor gear="0 0 0 0 0 1" site="motor3" name="motor3_torque" />
   </actuator>
-
-  <!-- Model Parameters
-  Below are all the parameters unique to the drone setup
-  Base is the Crazyflie 2.X, file name encodes the specific setup
-  - Propellers/Motors options: L(egacy), P(lus), T(hrust upgrade kit), B(rushless) 
-  - Battery (250mAh / 350mAh)
-  -->
-  <custom>
-    <!-- Physical Parameters-->
-    <numeric name="gravity" data="9.807" /> <!-- Munich, Germany-->
-    <!-- From IROS 2022 -->
-    <numeric name="mass" data="0.03454" />
-    <!-- <numeric name="J" data="1.4e-5 0.0    0.0 
-                            0.0    1.4e-5 0.0
-                            0.0    0.0    2.17e-5"/>  -->
-    <!-- From Förster B.S. thesis -->
-    <numeric name="J" data="1.68e-5 0.0    0.0 
-                            0.0    1.68e-5 0.0
-                            0.0    0.0    2.98e-5" />  
-    <!-- Distance of motor from axis 
-         in x configuration, it's 1/sqrt(2) smaller 
-         arm "+" = 0.046 (from CAD); arm "x" = 0.03253 (rounded)-->
-    <numeric name="arm" data="0.03253" />
-    <!-- Matrix on how to mix the forces into torques, different for "x" and "+" config-->
-    <numeric name="sign_matrix" data="-1 -1 -1 
-                                      -1  1  1 
-                                       1  1 -1 
-                                       1 -1  1" />
-    <numeric name="prop_radius" data="2.31348e-2" />
-
-    <!-- Motors and Thrust-->
-    <numeric name="PWM_MIN" data="20000.0" />
-    <numeric name="PWM_MAX" data="65535.0" />
-    <numeric name="THRUST_MIN" data="0.02" /> <!-- in N, per motor-->
-    <numeric name="THRUST_MAX" data="0.1125" /> <!-- in N, per motor-->
-    <numeric name="THRUST_TAU" data="6.9235846332510365" />
-    <numeric name="VMOTOR_MIN" data="1.003506695043662" /> <!-- in V-->
-    <numeric name="VMOTOR_MAX" data="2.903351097106251" /> <!-- in V-->
-    <numeric name="p_vmotor2thrust" data="-0.014830744918356092 0.04724465241828281 -0.01847364358025878 0.005960923942142" /> <!--Index is order-->
-    <numeric name="p_vmotor2rpm" data="2828.6593993157803 6686.5508078905705" /> <!--Index is order-->
-    <numeric name="kf" data="8.701227710666256e-10" />
-    <numeric name="km" data="7.94e-12" /> <!-- From old identification! TODO: Replace if possible-->
-
-  </custom>
 
 </mujoco>

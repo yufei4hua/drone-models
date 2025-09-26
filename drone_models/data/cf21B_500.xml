@@ -6,7 +6,6 @@
     <material name="gray" rgba="0.3 0.3 0.3 1"/>
     <material name="light-gray" rgba="0.7 0.7 0.7 1"/>
     <material name="silver" rgba="0.898 0.898 0.898 1"/>
-    <!-- <material name="white" rgba="1 1 1 1"/> -->
     <material name="gold" rgba="0.969 0.878 0.6 1"/>
     <material name="green" rgba="0.522 0.902 0.145 1"/>
 

@@ -9,16 +9,29 @@ J = [
     [0.0, 1.68e-5, 0.0],
     [0.0, 0.0, 2.98e-5]
 ]
-rpm2thrust = [0.0, 0.0, 3.16e-10] # TODO
-rpm2torque = [0.0, 0.0, 7.94e-12] # TODO
+rpm2thrust = [0.0, 0.0, 3.16e-10] # TODO, Index is order
+rpm2torque = [0.0, 0.0, 7.94e-12] # TODO, Index is order
 # TODO: This is an arbitrary number that leads to a working simulation. It MUST be fitted and
 # updated as soon as possible.
 thrust_tau = 0.03 # TODO value? TODO rename to rotor_tau
 mixing_matrix = [
-    [-1.0, -1.0, 1.0, 1.0],
+    [-1.0, -1.0,  1.0,  1.0],
     [-1.0,  1.0,  1.0, -1.0],
-    [-1.0, 1.0,  -1.0, 1.0]
+    [-1.0,  1.0, -1.0,  1.0]
 ]
+# The following parameters are for the platform, but are maybe not actually used by the models. However, 
+# we still keep them here in one place, since some other things (sim, estimator, firmware) might need them.
+pwm_min = 20000
+pwm_max = 65535
+thrust_min = 0.02  # in N per motor
+thrust_max = 0.1125  # in N per motor
+vmotor_min = 1.003506695043662  # in V
+vmotor_max = 2.903351097106251  # in V
+vmotor2thrust = [-0.014830744918356092, 0.04724465241828281, -0.01847364358025878, 0.005960923942142]  # Index is order
+vmotor2torque = [-0.014830744918356092, 0.04724465241828281, -0.01847364358025878, 0.005960923942142]  # TODO, Index is order
+vmotor2rpm = [2828.6593993157803, 6686.5508078905705]  # Index is order
+prop_radius = 23.55e-3 # TODO check
+prop_inertia = 34.52e-9 # TODO seems off
 
 
 [cf2x_P250]
@@ -31,33 +44,59 @@ J = [
     [0.0, 1.4e-5, 0.0],
     [0.0, 0.0, 2.17e-5]
 ]
-rpm2thrust = [0.0, 0.0, 5.792654323957372e-10] # TODO
-rpm2torque = [0.0, 0.0, 7.94e-12] # TODO
-thrust_tau = 7.2333515424212695 # TODO value? TODO rename to rotor_tau
+rpm2thrust = [0.0, 0.0, 5.792654323957372e-10] # TODO, Index is order
+rpm2torque = [0.0, 0.0, 7.94e-12] # TODO, Index is order
+thrust_tau = 0.138 # TODO value? TODO rename to rotor_tau
 mixing_matrix = [
-    [-1.0, -1.0, 1.0, 1.0],
+    [-1.0, -1.0,  1.0,  1.0],
     [-1.0,  1.0,  1.0, -1.0],
-    [-1.0, 1.0,  -1.0, 1.0]
+    [-1.0,  1.0, -1.0,  1.0]
 ]
+# The following parameters are for the platform, but are maybe not actually used by the models. However, 
+# we still keep them here in one place, since some other things (sim, estimator, firmware) might need them.
+pwm_min = 20000
+pwm_max = 65535
+thrust_min = 0.02  # in N per motor
+thrust_max = 0.1125  # in N per motor
+vmotor_min = 0.9857578735524497  # in V
+vmotor_max = 2.9966889966322077  # in V
+vmotor2thrust = [-0.02427920377129026, 0.06433042290821364, -0.026401054210489865, 0.006731877887386432]  # Index is order
+vmotor2torque = [-0.02427920377129026, 0.06433042290821364, -0.026401054210489865, 0.006731877887386432]  # TODO, Index is order
+vmotor2rpm = [4741.994550959416, 7472.9374014021605]  # Index is order
+prop_radius = 23.4e-3 # TODO check
+prop_inertia = 26.97e-9
 
 
 [cf2x_T350]
 gravity_vec = [0.0, 0.0, -9.81]
-mass = 0.03454
+mass = 0.03454 # TODO
 L = 0.03253
-J = [
+J = [ # TODO
     [1.4e-5, 0.0,    0.0],
     [0.0, 1.4e-5, 0.0],
     [0.0, 0.0, 2.17e-5]
 ]
-rpm2thrust = [0.0, 0.0, 1.068340683985525e-09] # TODO
-rpm2torque = [0.0, 0.0, 7.94e-12] # TODO
-thrust_tau = 8.719306881898989 # TODO value? TODO rename to rotor_tau
+rpm2thrust = [0.0, 0.0, 1.068340683985525e-09] # TODO, Index is order
+rpm2torque = [0.0, 0.0, 7.94e-12] # TODO, Index is order
+thrust_tau = 0.115 # TODO value? TODO rename to rotor_tau
 mixing_matrix = [
-    [-1.0, -1.0, 1.0, 1.0],
+    [-1.0, -1.0,  1.0,  1.0],
     [-1.0,  1.0,  1.0, -1.0],
-    [-1.0, 1.0,  -1.0, 1.0]
+    [-1.0,  1.0, -1.0,  1.0]
 ]
+# The following parameters are for the platform, but are maybe not actually used by the models. However, 
+# we still keep them here in one place, since some other things (sim, estimator, firmware) might need them.
+pwm_min = 20000
+pwm_max = 65535
+thrust_min = 0.03  # in N per motor
+thrust_max = 0.1625  # in N per motor
+vmotor_min = 0.983691398141343  # in V
+vmotor_max = 2.643523702759344  # in V
+vmotor2thrust = [-0.03978221591250353, 0.10979738851226176, -0.05545304285403245, 0.016215002062640885]  # Index is order
+vmotor2torque = [-0.03978221591250353, 0.10979738851226176, -0.05545304285403245, 0.016215002062640885]  # TODO, Index is order
+vmotor2rpm = [2738.439005850152, 8054.983767001532]  # Index is order
+prop_radius = 25.4e-3 # TODO check
+prop_inertia = 38.93e-9 # TODO value from B500, currenty unknown
 
 
 [cf21B_500]
@@ -69,8 +108,8 @@ J = [
     [0.0,    2.8e-5, 0.0],
     [0.0,    0.0,    4.9e-5]
 ]
-rpm2thrust = [0.0, -8.357406697944084e-07, 4.716909960828207e-10]
-rpm2torque = [0.0, 2.435151264350409e-09, 2.424629050055297e-12]
+rpm2thrust = [0.0, 2.6713375766104237e-06, 2.9910560258944037e-10] # TODO , Index is order
+rpm2torque = [0.0, 2.435151264350409e-09, 2.424629050055297e-12] # TODO , Index is order
 thrust2torque = 0.00593893393599368
 thrust_tau = 0.08 # TODO value? TODO rename to rotor_tau
 mixing_matrix = [
@@ -78,3 +117,16 @@ mixing_matrix = [
     [-1.0,  1.0,  1.0, -1.0],
     [-1.0,  1.0, -1.0,  1.0]
 ]
+# The following parameters are for the platform, but are maybe not actually used by the models. However, 
+# we still keep them here in one place, since some other things (sim, estimator, firmware) might need them.
+pwm_min = 20000
+pwm_max = 65535
+thrust_min = 0.03  # in N per motor
+thrust_max = 0.18  # in N per motor
+vmotor_min = 0.983691398141343  # in V
+vmotor_max = 2.643523702759344  # in V
+vmotor2thrust = [-0.023218159473266192, 0.057892237383960946, -0.005372315709548128, 0.003180315209941464]  # Index is order
+vmotor2torque = [-0.023218159473266192, 0.057892237383960946, -0.005372315709548128, 0.003180315209941464]  # TODO, Index is order
+vmotor2rpm = [4304.90684659941, 3948.957007115487]  # Index is order
+prop_radius = 27.5e-3 # TODO check
+prop_inertia = 38.93e-9
