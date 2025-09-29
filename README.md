@@ -4,7 +4,7 @@ $$
 
 ---
 
-Drone models @ LSY. Contains symbolic (CasADi) and numeric (ArrayAPI, i.e., NumPy, JAX, ...) versions as well as meshes of each model.
+Drone models @ LSY. Contains symbolic (CasADi) and numeric (ArrayAPI, i.e., NumPy, JAX, ...) drone dynamics.
 
 [![Python Version]][Python Version URL] [![Ruff Check]][Ruff Check URL] [![Tests]][Tests URL] [![Docs]][Docs URL]
 
@@ -19,6 +19,9 @@ Drone models @ LSY. Contains symbolic (CasADi) and numeric (ArrayAPI, i.e., NumP
 
 [Docs]: https://github.com/utiasDSL/drone-models/actions/workflows/docs.yml/badge.svg
 [Docs URL]: https://utiasdsl.github.io/drone-models/
+
+## Overview
+Collection of different drone dynamics models. Also includes meshes of each model.
 
 ## Installation
 
