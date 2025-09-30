@@ -28,7 +28,15 @@ jobs:
       with:
         pixi-version: v0.49.0
         cache: true
-        
+        # only write new caches on main pushes (optional)
+        cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+        # ensure the 'docs' environment(s) are installed
+        environments: docs
+        # don't activate env (we'll call pixi run -e docs explicitly)
+        activate-environment: false
+        # prefer using existing lockfile if present (faster, deterministic)
+        locked: true
+
     - name: Build documentation
       run: pixi run -e docs mkdocs build
       
