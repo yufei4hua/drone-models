@@ -53,30 +53,27 @@ def supports(rotor_dynamics: bool = True) -> Callable[[F], F]:
 def parametrize(
     fn: Callable[P, R], drone_model: str, xp: ModuleType | None = None, device: str | None = None
 ) -> Callable[P, R]:
-    """Parametrize a controller function with the default controller parameters for a drone model.
+    """Parametrize a dynamics function with the default dynamics parameters for a drone model.
 
     Args:
-        fn: The controller function to parametrize.
+        fn: The dynamics function to parametrize.
         drone_model: The drone model to use.
         xp: The array API module to use. If not provided, numpy is used.
         device: The device to use. If none, the device is inferred from the xp module.
 
     Example:
         ```python
-        controller_fn = parametrize(state2attitude, drone_model="cf2x_L250")
-        command_rpyt, int_pos_err = controller_fn(
-            pos=pos,
-            quat=quat,
-            vel=vel,
-            ang_vel=ang_vel,
-            cmd=cmd,
-            ctrl_errors=(int_pos_err,),
-            ctrl_freq=100,
+        from drone_models.core import parametrize
+        from drone_models.first_principles import dynamics
+
+        dynamics_fn = parametrize(dynamics, drone_model="cf2x_L250")
+        pos_dot, quat_dot, vel_dot, ang_vel_dot, rotor_vel_dot = dynamics_fn(
+            pos=pos, quat=quat, vel=vel, ang_vel=ang_vel, cmd=cmd, rotor_vel=rotor_vel
         )
         ```
 
     Returns:
-        The parametrized controller function with all keyword argument only parameters filled in.
+        The parametrized dynamics function with all keyword argument only parameters filled in.
     """
     try:
         xp = np if xp is None else xp

@@ -1,4 +1,4 @@
-"""Utility functions for the drone models and controllers."""
+"""Utility functions for the drone models."""
 
 from types import ModuleType
 from typing import Any
