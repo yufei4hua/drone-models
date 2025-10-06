@@ -29,8 +29,8 @@ find = {}
 drone_models = [
     "data/*.xml",
     "**/*.toml",
-    "data/assets/*.obj",
-    "data/assets/*.stl",
+    "data/assets/**/*.obj",
+    "data/assets/**/*.stl",
 ]
 
 [tool.pytest.ini_options]
