@@ -22,15 +22,18 @@ dependencies = [
     "array-api-extra",
 ]
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.packages]
 find = {}
 
 [tool.setuptools.package-data]
 drone_models = [
-    "data/*.xml", # 3D model information
+    "data/*.xml",    # 3D model information
     "data/**/*.obj", # 3D model information
     "data/**/*.stl", # 3D model information
-    "**/*.toml", # parameter information
+    "**/*.toml",     # parameter information
 ]
 
 [tool.pytest.ini_options]
