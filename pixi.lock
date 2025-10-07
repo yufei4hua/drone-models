@@ -523,7 +523,7 @@ packages:
 - pypi: ./
   name: drone-models
   version: 0.0.1
-  sha256: 46da256736bc0875819e717b25d8811c3bc8504fb0f6438a900bf69e0625f9ab
+  sha256: f6c121d3b3444065f9ce10965d046f12238d903b12abe9848fabdeb284a21035
   requires_dist:
   - numpy>=2.0.0
   - casadi>=3.7.0

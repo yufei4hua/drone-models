@@ -32,8 +32,8 @@ include = ["drone_models*"]
 
 [tool.setuptools.package-data]
 drone_models = [
-    "data/*",    # 3D model and parameter information
-    "**/*.toml", # model specific parameter information
+    "data/**/*.*", # 3D model and parameter information
+    "**/*.toml",   # model specific parameter information
 ]
 
 [tool.pytest.ini_options]
