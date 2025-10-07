@@ -20,20 +20,20 @@ dependencies = [
     "scipy @ git+https://github.com/scipy/scipy.git@4cb83b6",               # TODO: Replace with scipy 1.17 once released
     "array-api-typing @ git+https://github.com/data-apis/array-api-typing", # TODO: Replace with array-api-typing from pip once released
     "array-api-extra",
+    "pip",
 ]
 
 [tool.setuptools]
 include-package-data = true
 
-[tool.setuptools.packages]
-find = {}
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["drone_models*"]
 
 [tool.setuptools.package-data]
 drone_models = [
-    "data/*.xml",    # 3D model information
-    "data/**/*.obj", # 3D model information
-    "data/**/*.stl", # 3D model information
-    "**/*.toml",     # parameter information
+    "data/*",    # 3D model and parameter information
+    "**/*.toml", # model specific parameter information
 ]
 
 [tool.pytest.ini_options]
