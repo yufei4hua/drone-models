@@ -1,0 +1,2 @@
+recursive-include drone_models/data *.stl *.obj *.xml
+recursive-include drone_models *.toml
