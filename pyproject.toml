@@ -17,7 +17,7 @@ dependencies = [
     "numpy>=2.0.0",
     "casadi>=3.7.0",
     "array-api-compat",
-    "scipy @ git+https://github.com/scipy/scipy.git@4cb83b6",               # TODO: Replace with scipy 1.17 once released
+    # "scipy @ git+https://github.com/scipy/scipy.git@4cb83b6",               # TODO: Replace with scipy 1.17 once released
     "array-api-typing @ git+https://github.com/data-apis/array-api-typing", # TODO: Replace with array-api-typing from pip once released
     "array-api-extra",
     "pip",
@@ -32,8 +32,9 @@ include = ["drone_models"]
 
 [tool.setuptools.package-data]
 drone_models = [
-    "data/**/*.*", # 3D model and parameter information
-    "**/*.toml",   # model specific parameter information
+    "data/assets/cf2x/cf2x_pcb.stl",
+    "data/**/*.*",                   # 3D model and parameter information
+    "**/*.toml",                     # model specific parameter information
 ]
 
 [tool.pytest.ini_options]
